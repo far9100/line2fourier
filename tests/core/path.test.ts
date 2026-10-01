@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resampleClosed, type Pt } from '../../src/core/fourier.ts';
 import {
-  CLOSURE, INK, JUMP, PathError, buildPath, cleanStroke, kindSpans, normalizeToUnit, orientedPoints,
+  CLOSURE, FILL, INK, JUMP, PathError, buildPath, cleanStroke, kindSpans, normalizeToUnit, orientedPoints,
   prepareStrokes, samplePath, strokesBBox, type Stroke,
 } from '../../src/core/path.ts';
 
@@ -53,7 +53,8 @@ describe('building the closed path (spec §4.6)', () => {
     expect(p.poly).toEqual(square.pts);
     expect(Array.from(p.kinds)).toEqual([INK, INK, INK, INK]);
     expect(p.total).toBe(4);
-    expect(p.lengths).toEqual([4, 0, 0]);
+    expect(p.lengths).toEqual([4, 0, 0, 0]);
+    expect(p.fillWidth).toBe(0);
   });
 
   it('a single open stroke is closed by a straight closure segment', () => {
@@ -85,6 +86,18 @@ describe('building the closed path (spec §4.6)', () => {
     expect(p.poly).toEqual([[0, 0], [1, 2], [2, 0], [1, 0], [1, 1], [0, 1], [0, 0], [1, 0]]);
     expect(Array.from(p.kinds)).toEqual([INK, INK, JUMP, INK, INK, INK, INK, JUMP]);
     expect(p.lengths[INK]).toBeCloseTo(2 * Math.hypot(1, 2) + 4, 12);
+  });
+
+  it('a stroke that paints an area is fill, keeps its pen through cleaning, and scales with the drawing (D42)', () => {
+    const painted: Stroke = { pts: [[2, 0], [3, 0], [3, 1], [3, 1], [2, 1]], closed: true, fill: 0.5 };
+    expect(cleanStroke(painted)).toEqual({ pts: [[2, 0], [3, 0], [3, 1], [2, 1]], closed: true, fill: 0.5 });
+    const p = buildPath([vee, cleanStroke(painted)]);
+    expect(Array.from(p.kinds)).toEqual([INK, INK, FILL, FILL, FILL, FILL, JUMP]); // it starts where the vee ends: no jump
+    expect(p.lengths[FILL]).toBe(4);
+    expect(p.fillWidth).toBe(0.5);
+    const [, n] = normalizeToUnit([vee, painted]); // 3 wide, so scaled by 2/3
+    expect(n.fill).toBeCloseTo(1 / 3, 12);
+    expect(buildPath([cleanStroke(painted)]).kinds.every(k => k === FILL)).toBe(true); // alone, it closes as fill
   });
 
   it('cum holds the arc length at every vertex', () => {

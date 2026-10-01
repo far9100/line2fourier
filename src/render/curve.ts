@@ -1,11 +1,11 @@
 // The approximation curve as something to draw: the N samples of partialCurve plus an exact point
-// at every edge of a jump or closure span, each interval labelled with its kind. The canvas, the
-// SVG export and (later) the video and flipbook all trace the curve from this one list, so the
-// pen lifts exactly where a stroke ends instead of up to one sample later (DECISIONS.md D5).
+// at every edge of a jump, closure or fill span, each interval labelled with its kind. The canvas,
+// the SVG export, the video and the flipbook all trace the curve from this one list, so the pen
+// lifts exactly where a stroke ends instead of up to one sample later (DECISIONS.md D5).
 import { chainInto, type Pt, type Term } from '../core/fourier.ts';
-import { CLOSURE, INK, JUMP, type SegKind } from '../core/path.ts';
+import { CLOSURE, FILL, INK, JUMP, type SegKind } from '../core/path.ts';
 
-export interface Spans { jump: [number, number][]; closure: [number, number][] }
+export interface Spans { jump: [number, number][]; closure: [number, number][]; fill: [number, number][] }
 
 export interface CurveEvents {
   count: number;
@@ -14,6 +14,8 @@ export interface CurveEvents {
   y: Float64Array;
   /** kind[i] is the kind of the stretch from event i to event i + 1. */
   kind: Uint8Array;
+  /** The width of the pen that paints the fill stretches (world units), 0 when there are none. */
+  fillWidth: number;
 }
 
 /** Something to draw lines into: a Path2D, a canvas context, or the SVG writer. */
@@ -32,6 +34,7 @@ export function tipAt(c0: Term, terms: Term[], M: number, t: number, scratch = n
 export function kindAt(spans: Spans, t: number): SegKind {
   for (const [a, b] of spans.jump) if (t > a && t < b) return JUMP;
   for (const [a, b] of spans.closure) if (t > a && t < b) return CLOSURE;
+  for (const [a, b] of spans.fill) if (t > a && t < b) return FILL;
   return INK;
 }
 
@@ -39,9 +42,9 @@ export function kindAt(spans: Spans, t: number): SegKind {
  * Merge the samples approx[n] at t = n/len (plus the first one again at t = 1, the curve being
  * closed) with the span edges, evaluated with `at`.
  */
-export function curveEvents(approx: Pt[], spans: Spans, at: (t: number) => Pt): CurveEvents {
+export function curveEvents(approx: Pt[], spans: Spans, at: (t: number) => Pt, fillWidth = 0): CurveEvents {
   const len = approx.length;
-  const edges = [...spans.jump.flat(), ...spans.closure.flat()].filter(e => e > 0 && e < 1).sort((a, b) => a - b);
+  const edges = [...spans.jump.flat(), ...spans.closure.flat(), ...spans.fill.flat()].filter(e => e > 0 && e < 1).sort((a, b) => a - b);
   const ts: number[] = [], xs: number[] = [], ys: number[] = [];
   const push = (t: number, p: Pt) => { ts.push(t); xs.push(p[0]); ys.push(p[1]); };
   let e = 0;
@@ -55,26 +58,30 @@ export function curveEvents(approx: Pt[], spans: Spans, at: (t: number) => Pt): 
   const count = ts.length;
   const kind = new Uint8Array(count);
   // Spans are sorted, so one walk over them labels every interval.
-  const all = [...spans.jump.map(s => [s[0], s[1], JUMP] as const), ...spans.closure.map(s => [s[0], s[1], CLOSURE] as const)]
-    .sort((p, q) => p[0] - q[0]);
+  const all = [
+    ...spans.jump.map(s => [s[0], s[1], JUMP] as const),
+    ...spans.closure.map(s => [s[0], s[1], CLOSURE] as const),
+    ...spans.fill.map(s => [s[0], s[1], FILL] as const),
+  ].sort((p, q) => p[0] - q[0]);
   let s = 0;
   for (let i = 0; i + 1 < count; i++) {
     const mid = (ts[i] + ts[i + 1]) / 2;
     while (s < all.length && all[s][1] <= mid) s++;
     kind[i] = s < all.length && all[s][0] < mid ? all[s][2] : INK;
   }
-  return { count, t: Float64Array.from(ts), x: Float64Array.from(xs), y: Float64Array.from(ys), kind };
+  return { count, t: Float64Array.from(ts), x: Float64Array.from(xs), y: Float64Array.from(ys), kind, fillWidth };
 }
 
 /**
- * Draw the curve from t = 0 up to tEnd (all of it when tEnd ≥ 1) into `ink` and `closure`,
- * leaving the jumps out; when the curve is cut short it ends at `tip`.
+ * Draw the curve from t = 0 up to tEnd (all of it when tEnd ≥ 1) into `ink`, `closure` and `fill`
+ * (the stretches that paint an area, drawn with the wide pen), leaving the jumps out; when the
+ * curve is cut short it ends at `tip`.
  */
-export function traceCurve(ev: CurveEvents, tEnd: number, tip: Pt | null, ink: PathSink, closure: PathSink): void {
+export function traceCurve(ev: CurveEvents, tEnd: number, tip: Pt | null, ink: PathSink, closure: PathSink, fill: PathSink = ink): void {
   let pen: PathSink | null = null;
   for (let i = 0; i + 1 < ev.count && ev.t[i] < tEnd; i++) {
     const k = ev.kind[i];
-    const sink = k === JUMP ? null : k === CLOSURE ? closure : ink;
+    const sink = k === JUMP ? null : k === CLOSURE ? closure : k === FILL ? fill : ink;
     if (!sink) { pen = null; continue; }
     if (pen !== sink) { sink.moveTo(ev.x[i], ev.y[i]); pen = sink; }
     if (ev.t[i + 1] <= tEnd || !tip) {

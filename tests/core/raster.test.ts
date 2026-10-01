@@ -64,7 +64,7 @@ describe('grey levels and threshold', () => {
   });
 });
 
-describe('solid areas are outlined, not thinned (DECISIONS.md D40)', () => {
+describe('solid areas are outlined and painted, not thinned (DECISIONS.md D40, D42)', () => {
   it('the chamfer distance to the paper is 1 on a line one pixel wide, and grows inside a block', () => {
     const w = 9, h = 9, bits = new Uint8Array(w * h);
     for (let y = 1; y < 8; y++) for (let x = 1; x < 8; x++) bits[y * w + x] = 1;
@@ -86,7 +86,7 @@ describe('solid areas are outlined, not thinned (DECISIONS.md D40)', () => {
     expect(outlines(diagonal, w, h)).toHaveLength(2);
   });
 
-  it('a solid disk among thin lines becomes its outline; the thin lines stay lines', () => {
+  it('a solid disk among thin lines becomes its outline, painted in; the thin lines stay lines', () => {
     const w = 200, h = 140;
     const ink = any(disk(60, 70, 22), bar(110, 20, 190, 21), bar(110, 60, 190, 61), bar(110, 100, 190, 101), bar(82, 69, 110, 70));
     const g = toGray(image(w, h, ink), w, h);
@@ -95,17 +95,22 @@ describe('solid areas are outlined, not thinned (DECISIONS.md D40)', () => {
     expect(fill.regions).toBe(1);
     expect(fill.halfWidth).toBeLessThan(1.5);
     const r = rasterToStrokes(image(w, h, ink), w, h);
-    expect(r.outlined).toBe(1);
-    const outline = r.strokes.filter(s => s.closed);
+    expect(r.filled).toBe(1);
+    expect(r.warnings['import.filled']).toBe(1);
+    const outline = r.strokes.filter(s => s.closed && !s.fill);
     expect(outline).toHaveLength(1);
     for (const [x, y] of outline[0].pts) expect(Math.abs(Math.hypot(x - 60, y - 70) - 22)).toBeLessThan(2.5);
-    // Nothing is traced inside the disk.
+    // Nothing is traced inside the disk; it is painted, by one walk that stays in it.
     for (const s of r.strokes.filter(t => !t.closed)) for (const [x, y] of s.pts) expect(Math.hypot(x - 60, y - 70)).toBeGreaterThan(18);
+    const paint = r.strokes.filter(s => s.fill);
+    expect(paint).toHaveLength(1);
+    expect(paint[0].closed).toBe(true);
+    for (const [x, y] of paint[0].pts) expect(Math.hypot(x - 60, y - 70)).toBeLessThan(22.5 - paint[0].fill! / 3 + 0.5); // a spacing in from the edge
   });
 
   it('a drawing of thick lines only has no solid areas: thickness is judged against its own lines', () => {
     const r = rasterToStrokes(image(120, 120, ring(60, 60, 40, 9)), 120, 120);
-    expect(r.outlined).toBe(0);
+    expect(r.filled).toBe(0);
     expect(r.strokes).toHaveLength(1);
     expect(r.strokes[0].closed).toBe(true);
   });

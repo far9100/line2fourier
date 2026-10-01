@@ -1,10 +1,11 @@
 // One frame on a 2D canvas (spec §6 "主畫布"): the original line (dashed, faint), the full
 // approximation after the first cycle (faint), the trail of this cycle up to the pen, the circles and
 // their links, c_0 as a fixed link from the origin, and the pen. Everything is drawn in world
-// units under one transform; line widths and dashes are divided by the scale so they stay in pixels.
+// units under one transform; line widths and dashes are divided by the scale so they stay in pixels,
+// except the pen that paints areas, which is as wide as the drawing says (DECISIONS.md D42).
 import type { Computed } from '../app/pipeline.ts';
 import { chainInto, type Pt } from '../core/fourier.ts';
-import { CLOSURE, JUMP } from '../core/path.ts';
+import { CLOSURE, FILL, JUMP } from '../core/path.ts';
 import type { Camera } from './camera.ts';
 import { kindAt, traceCurve, type CurveEvents } from './curve.ts';
 import type { Style } from './theme.ts';
@@ -17,26 +18,31 @@ export interface Scene {
   events: CurveEvents;
   originalInk: Path2D;
   originalClosure: Path2D;
+  originalFill: Path2D;
   fullInk: Path2D;
   fullClosure: Path2D;
+  fullFill: Path2D;
   joints: Float64Array;
 }
 
 export function buildScene(computed: Computed, events: CurveEvents): Scene {
-  const originalInk = new Path2D(), originalClosure = new Path2D();
+  const originalInk = new Path2D(), originalClosure = new Path2D(), originalFill = new Path2D();
   const { poly, kinds } = computed.path;
   const n = poly.length;
   for (let i = 0; i < n; i++) {
     const kind = kinds[i];
     if (kind === JUMP) continue;
-    const target = kind === CLOSURE ? originalClosure : originalInk;
+    const target = kind === CLOSURE ? originalClosure : kind === FILL ? originalFill : originalInk;
     const a = poly[i], b = poly[(i + 1) % n];
     if (i === 0 || kinds[i - 1] !== kind) target.moveTo(a[0], a[1]);
     target.lineTo(b[0], b[1]);
   }
-  const fullInk = new Path2D(), fullClosure = new Path2D();
-  traceCurve(events, 1, null, fullInk, fullClosure);
-  return { computed, events, originalInk, originalClosure, fullInk, fullClosure, joints: new Float64Array(2 * computed.M + 2) };
+  const fullInk = new Path2D(), fullClosure = new Path2D(), fullFill = new Path2D();
+  traceCurve(events, 1, null, fullInk, fullClosure, fullFill);
+  return {
+    computed, events, originalInk, originalClosure, originalFill, fullInk, fullClosure, fullFill,
+    joints: new Float64Array(2 * computed.M + 2),
+  };
 }
 
 export interface FrameOptions {
@@ -90,7 +96,16 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
 
   const stats: FrameStats = { tip: [0, 0], penUp: false, circlesDrawn: 0, highlight: null };
 
+  // Painted areas: the pen is as wide as the rings are far apart and more, never thinner than a line.
+  const fillWidth = scene ? Math.max(scene.events.fillWidth, 2 * px) : 0;
+
   if (scene && o.showOriginal) {
+    if (scene.events.fillWidth > 0) {
+      ctx.globalAlpha = 0.14;
+      ctx.strokeStyle = style.ink;
+      ctx.lineWidth = fillWidth;
+      ctx.stroke(scene.originalFill);
+    }
     ctx.globalAlpha = 0.38;
     ctx.strokeStyle = style.ink;
     ctx.lineWidth = 1.25 * px;
@@ -114,6 +129,10 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
     ctx.strokeStyle = style.brass;
     if (o.showFull) {
       ctx.globalAlpha = 0.3;
+      if (scene.events.fillWidth > 0) {
+        ctx.lineWidth = fillWidth;
+        ctx.stroke(scene.fullFill);
+      }
       ctx.lineWidth = 1.5 * px;
       ctx.stroke(scene.fullInk);
       ctx.setLineDash([6 * px, 4 * px]);
@@ -121,9 +140,13 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
       ctx.setLineDash([]);
     }
 
-    const trailInk = new Path2D(), trailClosure = new Path2D();
-    traceCurve(scene.events, o.t, tip, trailInk, trailClosure);
+    const trailInk = new Path2D(), trailClosure = new Path2D(), trailFill = new Path2D();
+    traceCurve(scene.events, o.t, tip, trailInk, trailClosure, trailFill);
     ctx.globalAlpha = 1;
+    if (scene.events.fillWidth > 0) {
+      ctx.lineWidth = fillWidth;
+      ctx.stroke(trailFill);
+    }
     ctx.lineWidth = 2 * px;
     ctx.stroke(trailInk);
     ctx.setLineDash([6 * px, 4 * px]);

@@ -171,3 +171,38 @@ test('a project with the SVG embedded opens without asking; without it, the file
   expect(after.M).toBe(40);
   expect(after.metrics).toEqual(before.metrics);
 });
+
+test('a picture with a solid area: outlined, painted in with the wide pen, and said so (D42)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); // paused, with the whole approximation drawn
+  await open(page);
+  // A solid disk and a ring drawn as a line, black on white, made by the page's own canvas.
+  const png = await page.evaluate(async () => {
+    const c = document.createElement('canvas');
+    c.width = 400; c.height = 300;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 400, 300);
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(120, 150, 50, 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(300, 150, 60, 0, 2 * Math.PI); ctx.stroke();
+    const blob = await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/png'));
+    return Array.from(new Uint8Array(await blob.arrayBuffer()));
+  });
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#upload').click()]);
+  await chooser.setFiles({ name: 'disk-and-ring.png', mimeType: 'image/png', buffer: Buffer.from(png) });
+  await expect(page.locator('#toast')).toContainText('1 塊塗黑的區域照原畫塗滿', { timeout: 20_000 });
+  const d = await debug(page);
+  expect((d as unknown as { fillWidth: number }).fillWidth).toBeGreaterThan(0);
+
+  await page.getByText('顯示圓', { exact: true }).click();
+  await page.getByText('顯示原始線稿', { exact: true }).click();
+  await page.waitForTimeout(200);
+  const paint = await evalDebug<Point[]>(page, 'mids', 3);
+  expect(paint.length).toBeGreaterThan(10);
+  let drawn = 0;
+  for (const p of paint) if (await brassNear(page, p, 2)) drawn++;
+  expect(drawn / paint.length).toBeGreaterThan(0.9);
+  // Solid, not hatched: brass in the middle of the disk too, between the rings.
+  const mid: Point = [paint.reduce((a, p) => a + p[0], 0) / paint.length, paint.reduce((a, p) => a + p[1], 0) / paint.length];
+  expect(await brassNear(page, mid, 1)).toBe(true);
+});

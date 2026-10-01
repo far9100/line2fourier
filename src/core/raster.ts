@@ -2,12 +2,13 @@
 // skeleton as a graph → Euler trails. Written from the published algorithms; coordinates are pixel
 // centres with y down (the importer flips and normalizes them).
 //
-// Two things make the result drawable with few pen lifts (DECISIONS.md D33, D39, D40):
-// - areas of solid ink (dark eyes, shadows) are outlined, not thinned: the skeleton of a solid
-//   area is a ladder of short branches, every branch end a pen lift;
+// Two things make the result drawable with few pen lifts (DECISIONS.md D33, D39, D40, D42):
+// - areas of solid ink (dark eyes, shadows) are outlined and painted, not thinned: the skeleton of
+//   a solid area is a ladder of short branches, every branch end a pen lift;
 // - the thin lines are walked as Euler trails: a line goes on through a junction instead of
 //   stopping there, so a stroke ends only where the drawing forces a pen lift (at its odd
 //   junctions and end points, paired off nearest first).
+import { fillSpacing, isolines, paintAreas, regionsOf } from './fill.ts';
 import type { Pt } from './fourier.ts';
 import type { Stroke } from './path.ts';
 import { douglasPeucker } from './simplify.ts';
@@ -69,32 +70,6 @@ export function binarize(g: Gray, threshold: number): { bits: Uint8Array; invert
   const inverted = ink > bits.length / 2;
   if (inverted) for (let i = 0; i < bits.length; i++) bits[i] ^= 1;
   return { bits, inverted };
-}
-
-/** 8-connected components of the set pixels, as lists of pixel indices. */
-function regionsOf(bits: Uint8Array, w: number, h: number): Int32Array[] {
-  const seen = new Uint8Array(bits.length);
-  const queue = new Int32Array(bits.length);
-  const out: Int32Array[] = [];
-  for (let start = 0; start < bits.length; start++) {
-    if (!bits[start] || seen[start]) continue;
-    let head = 0, tail = 0;
-    queue[tail++] = start;
-    seen[start] = 1;
-    while (head < tail) {
-      const p = queue[head++], x = p % w, y = (p - x) / w;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx, ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-          const q = ny * w + nx;
-          if (bits[q] && !seen[q]) { seen[q] = 1; queue[tail++] = q; }
-        }
-      }
-    }
-    out.push(queue.slice(0, tail));
-  }
-  return out;
 }
 
 /** Remove 8-connected specks smaller than minArea pixels, in place; returns how many were removed. */
@@ -168,7 +143,7 @@ export function chamfer(from: Uint8Array, w: number, h: number): Float32Array {
 }
 
 export interface SolidAreas {
-  /** The ink that belongs to solid areas (outlined, not thinned). */
+  /** The ink that belongs to solid areas (outlined and painted, not thinned). */
   solid: Uint8Array;
   /** The typical half width of a line, in pixels. */
   halfWidth: number;
@@ -214,56 +189,11 @@ export function solidAreas(bits: Uint8Array, w: number, h: number): SolidAreas {
 }
 
 /**
- * The boundaries of the set pixels as closed loops (marching squares between pixel centres;
- * pixels that touch only at a corner are kept apart). Points are in pixel-centre coordinates.
+ * The boundaries of the set pixels as closed loops, between pixel centres (pixels that touch only
+ * at a corner are kept apart), in image coordinates.
  */
 export function outlines(mask: Uint8Array, w: number, h: number): Pt[][] {
-  const m = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : mask[y * w + x]);
-  // Edge points: on the horizontal grid edge from node (x, y) to (x+1, y), or the vertical one to (x, y+1).
-  const H = (x: number, y: number) => 2 * ((y + 1) * (w + 2) + (x + 1));
-  const V = (x: number, y: number) => 2 * ((y + 1) * (w + 2) + (x + 1)) + 1;
-  const where = (k: number): Pt => {
-    const cell = k >> 1, x = (cell % (w + 2)) - 1, y = Math.floor(cell / (w + 2)) - 1;
-    return k & 1 ? [x + 0.5, y + 1] : [x + 1, y + 0.5]; // pixel centre (x, y) is at (x + 0.5, y + 0.5)
-  };
-  const links = new Map<number, number[]>();
-  const link = (a: number, b: number) => {
-    (links.get(a) ?? links.set(a, []).get(a)!).push(b);
-    (links.get(b) ?? links.set(b, []).get(b)!).push(a);
-  };
-  for (let y = -1; y < h; y++) {
-    for (let x = -1; x < w; x++) {
-      const tl = m(x, y), tr = m(x + 1, y), br = m(x + 1, y + 1), bl = m(x, y + 1);
-      const T = H(x, y), B = H(x, y + 1), L = V(x, y), R = V(x + 1, y);
-      switch (tl * 8 + tr * 4 + br * 2 + bl) {
-        case 1: case 14: link(L, B); break;
-        case 2: case 13: link(B, R); break;
-        case 3: case 12: link(L, R); break;
-        case 4: case 11: link(T, R); break;
-        case 6: case 9: link(T, B); break;
-        case 7: case 8: link(T, L); break;
-        case 5: link(T, R); link(L, B); break; // tr and bl only: two separate corners
-        case 10: link(T, L); link(B, R); break; // tl and br only
-      }
-    }
-  }
-  const loops: Pt[][] = [];
-  const done = new Set<number>();
-  for (const start of [...links.keys()].sort((a, b) => a - b)) {
-    if (done.has(start)) continue;
-    const loop: Pt[] = [];
-    let prev = -1, cur = start;
-    while (!done.has(cur)) {
-      done.add(cur);
-      loop.push(where(cur));
-      const next = links.get(cur)!.find(k => k !== prev && !done.has(k)) ?? -1;
-      if (next < 0) break;
-      prev = cur;
-      cur = next;
-    }
-    if (loop.length >= 3) loops.push(loop);
-  }
-  return loops;
+  return isolines(mask, w, h, 0.5);
 }
 
 // ---------------------------------------------------------------- the skeleton as a graph
@@ -492,8 +422,8 @@ export interface RasterResult {
   h: number;
   inkShare: number;
   inverted: boolean;
-  /** Solid areas drawn by their outline. */
-  outlined: number;
+  /** Solid areas outlined and painted in (DECISIONS.md D42). */
+  filled: number;
   /** i18n key → count. */
   warnings: Record<string, number>;
 }
@@ -519,7 +449,7 @@ export function rasterToStrokes(rgba: ArrayLike<number>, width: number, height: 
   if (inverted) warnings['raster.inverted'] = 1;
   if (inkShare > 0.35) warnings['raster.photo'] = 1;
 
-  // Solid areas are outlined; the rest is thinned and walked as a graph.
+  // Solid areas are outlined and painted; the rest is thinned and walked as a graph.
   const fill = solidAreas(bits, w, h);
   const thin = new Uint8Array(bits.length);
   for (let i = 0; i < bits.length; i++) thin[i] = bits[i] && !fill.solid[i] ? 1 : 0;
@@ -527,7 +457,11 @@ export function rasterToStrokes(rgba: ArrayLike<number>, width: number, height: 
   const strokes: Stroke[] = [];
   for (const s of eulerTrails(graph)) { const t = simplify(s); if (t) strokes.push(t); }
   for (const loop of outlines(fill.solid, w, h)) { const t = simplify({ pts: loop, closed: true }); if (t) strokes.push(t); }
-  if (fill.regions > 0) warnings['raster.outlined'] = fill.regions;
+  let solidArea = 0;
+  for (const b of fill.solid) solidArea += b;
+  const painted = paintAreas(fill.solid, w, h, fillSpacing(solidArea, Math.max(w, h)));
+  strokes.push(...painted.strokes);
+  if (painted.areas > 0) warnings['import.filled'] = painted.areas;
   if (strokes.length > 3000) warnings['raster.photo'] = 1;
-  return { strokes, w, h, inkShare, inverted, outlined: fill.regions, warnings };
+  return { strokes, w, h, inkShare, inverted, filled: painted.areas, warnings };
 }

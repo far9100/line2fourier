@@ -3,7 +3,7 @@
 // (§4.6), and pick N for its length.
 import { BRIDGE_SHARE, bridgeEnds } from '../core/bridge.ts';
 import { curvesToStrokes, parseCurvesJson } from '../core/line2funcImport.ts';
-import { JUMP, PathError, buildPath, normalizeToUnit, prepareStrokes, strokesBBox, type Stroke } from '../core/path.ts';
+import { JUMP, PathError, buildPath, normalizeToUnit, prepareStrokes, strokesBBox, withPts, type Stroke } from '../core/path.ts';
 import { simplifyDrawing } from '../core/simplify.ts';
 import { readSvg, svgItemsToStrokes, type ImportWarnings } from '../core/svgImport.ts';
 import { autoN, type NSize } from '../core/ticks.ts';
@@ -104,7 +104,9 @@ export async function prepareImport(kind: 'svg' | 'line2func', text: string, tou
     const read = parseCurvesJson(text);
     if ('error' in read) return { error: `import.error.curves.${read.error}` };
     const c = curvesToStrokes(read.doc);
-    if (c.skippedFill > 0) warnings['line2func.skippedFill'] = c.skippedFill;
+    // The hatching is left out because the areas are painted instead; it is said so when none is.
+    if (c.filled > 0) warnings['import.filled'] = c.filled;
+    else if (c.skippedFill > 0) warnings['line2func.skippedFill'] = c.skippedFill;
     raw = c.strokes;
   }
   return finishImport(raw, warnings, tour);
@@ -112,7 +114,7 @@ export async function prepareImport(kind: 'svg' | 'line2func', text: string, tou
 
 /** Strokes traced from an image (pixel coordinates, y down; see core/raster.ts), turned y up. */
 export function imageStrokes(strokes: Stroke[], height: number): Stroke[] {
-  return strokes.map(s => ({ closed: s.closed, pts: s.pts.map(([x, y]) => [x, height - y] as Pt) }));
+  return strokes.map(s => withPts(s, s.pts.map(([x, y]) => [x, height - y] as Pt)));
 }
 
 /** SHA-256 of the file as hex (spec §10: an imported source is saved by name and hash). */

@@ -100,7 +100,7 @@ function recompute(s: AppState): boolean {
   if (changed) {
     const { c0, terms } = next.ordered;
     const scratch = new Float64Array(2 * next.M + 2);
-    view.scene = buildScene(next, curveEvents(next.approx, next.spans, tt => tipAt(c0, terms, next.M, tt, scratch)));
+    view.scene = buildScene(next, curveEvents(next.approx, next.spans, tt => tipAt(c0, terms, next.M, tt, scratch), next.path.fillWidth));
   }
   dirty = true;
   return true;
@@ -342,7 +342,7 @@ $('#download-svg').addEventListener('click', () => {
   const { c0, terms, M } = currentTerms();
   const fine = partialCurve(c0, terms, M, Math.max(computed.N, 8192));
   const scratch = new Float64Array(2 * M + 2);
-  const events = curveEvents(fine, computed.spans, tt => tipAt(c0, terms, M, tt, scratch));
+  const events = curveEvents(fine, computed.spans, tt => tipAt(c0, terms, M, tt, scratch), computed.path.fillWidth);
   downloadText(toSvg(events, { widthMm, strokeMm }), 'line2fourier.svg', 'image/svg+xml');
 });
 $('#project-save').addEventListener('click', () => {
@@ -683,7 +683,8 @@ Object.defineProperty(window, '__l2f', {
           ? { x: cam.ox + cam.s * (view.last.highlight.x - cam.cx), y: cam.oy - cam.s * (view.last.highlight.y - cam.cy), r: view.last.highlight.r * cam.s, j: view.last.highlight.j }
           : null,
         spectrumK: spectrumK(s),
-        /** Midpoints of the original path's segments of each kind, on screen (0 ink, 1 closure, 2 jump). */
+        fillWidth: computed.path.fillWidth,
+        /** Midpoints of the original path's segments of each kind, on screen (0 ink, 1 closure, 2 jump, 3 fill). */
         mids: (kind: number) => Array.from(computed.path.kinds).flatMap((k, i) => {
           if (k !== kind) return [];
           const a = computed.path.poly[i], b = computed.path.poly[(i + 1) % computed.path.poly.length];

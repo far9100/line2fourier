@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { fillSpacing } from '../../src/core/fill.ts';
 import { mulberry32, type Pt } from '../../src/core/fourier.ts';
 import { curvesToStrokes, parseCurvesJson, type CurvesJson } from '../../src/core/line2funcImport.ts';
 import { JUMP, buildPath, normalizeToUnit, prepareStrokes, type Stroke } from '../../src/core/path.ts';
@@ -32,14 +33,43 @@ describe('line2func curves.json (spec §5.4)', () => {
   });
 
   it('joins the curves of a stroke, flips y, finds closed strokes and leaves fill hatching out', () => {
-    const { strokes, skippedFill } = curvesToStrokes(curves());
+    const { strokes, skippedFill, filled } = curvesToStrokes(curves());
     expect(skippedFill).toBe(1);
+    expect(filled).toBe(0); // no area outline in this file: nothing painted
     expect(strokes).toHaveLength(2);
     expect(strokes[0].closed).toBe(false);
     expect(strokes[0].pts[0]).toEqual([0, 50]); // y = 0 at the top of a 50 px image
     expect(strokes[0].pts[strokes[0].pts.length - 1]).toEqual([30, 20]);
     expect(strokes[1].closed).toBe(true);
     expect(curvesToStrokes(curves(), { includeFill: true }).strokes).toHaveLength(3);
+  });
+
+  it('the filled areas (closed fill_outline strokes) are painted in, holes left bare (D42)', () => {
+    const square = (x0: number, y0: number, x1: number, y1: number, stroke: number) => [
+      { stroke, ctrl: [[x0, y0], [x0, y0], [x1, y0], [x1, y0]] as [Pt, Pt, Pt, Pt], tags: ['fill_outline'] },
+      { stroke, ctrl: [[x1, y0], [x1, y0], [x1, y1], [x1, y1]] as [Pt, Pt, Pt, Pt], tags: ['fill_outline'] },
+      { stroke, ctrl: [[x1, y1], [x1, y1], [x0, y1], [x0, y1]] as [Pt, Pt, Pt, Pt], tags: ['fill_outline'] },
+      { stroke, ctrl: [[x0, y1], [x0, y1], [x0, y0], [x0, y0]] as [Pt, Pt, Pt, Pt], tags: ['fill_outline'] },
+    ];
+    const doc = curves({
+      image: { width: 200, height: 100 },
+      curves: [...square(20, 20, 80, 80, 0), ...square(40, 40, 60, 60, 1), { stroke: 2, ctrl: [[30, 30], [35, 35], [40, 40], [45, 45]], tags: ['fill'] }],
+    });
+    const { strokes, skippedFill, filled } = curvesToStrokes(doc);
+    expect(skippedFill).toBe(1);
+    expect(filled).toBe(1);
+    const paint = strokes.filter(s => s.fill);
+    expect(strokes.filter(s => !s.fill)).toHaveLength(2); // the two outlines stay lines
+    expect(paint.length).toBeGreaterThanOrEqual(1);
+    expect(paint[0].fill).toBeCloseTo(3 * fillSpacing(60 * 60 - 20 * 20, 200), 12); // the pen is three ring spacings wide
+    for (const s of paint) {
+      for (const [x, yUp] of s.pts) {
+        const y = 100 - yUp;
+        expect(x > 20 && x < 80 && y > 20 && y < 80).toBe(true); // inside the outer square
+        expect(x > 40 && x < 60 && y > 40 && y < 60).toBe(false); // and not in the hole
+      }
+    }
+    expect(curvesToStrokes(doc, { includeFill: true })).toMatchObject({ filled: 0, skippedFill: 0 });
   });
 
   it('a stroke id that continues somewhere else starts a new stroke', () => {
@@ -132,6 +162,9 @@ describe('ordering strokes (spec §4.6, M2 acceptance)', () => {
   it('the worker’s handler packs, orders and answers', () => {
     const strokes = randomStrokes(5, 12);
     expect(unpack(pack(strokes))).toEqual(strokes);
+    const painted = [...strokes, { pts: [[0, 0], [1, 0], [1, 1]] as Pt[], closed: true, fill: 0.125 }];
+    expect(unpack(pack(painted))).toEqual(painted);
+    expect(applyTour(painted, optimizeTour(painted).steps).filter(s => s.fill)).toHaveLength(1);
     const res = handle({ id: 7, type: 'tour', strokes: pack(strokes) });
     expect(res).toMatchObject({ id: 7, ok: true });
     if (res.ok && 'tour' in res) expect(res.tour).toEqual(optimizeTour(strokes));

@@ -1,14 +1,24 @@
 // Strokes → one closed path. Every segment of the path has a kind: ink is drawn, closure is the
-// straight line that closes a single open stroke (drawn dashed in the original), and jump is the
-// pen-up move between strokes (computed with the rest, never drawn). Spec §4.1, §4.6, §13.
+// straight line that closes a single open stroke (drawn dashed in the original), jump is the
+// pen-up move between strokes (computed with the rest, never drawn), and fill paints an area with
+// a pen as wide as the stroke says (DECISIONS.md D42). Spec §4.1, §4.6, §13.
 import { resampleClosedIndexed, type Pt } from './fourier.ts';
 
 export const INK = 0;
 export const CLOSURE = 1;
 export const JUMP = 2;
-export type SegKind = typeof INK | typeof CLOSURE | typeof JUMP;
+export const FILL = 3;
+export type SegKind = typeof INK | typeof CLOSURE | typeof JUMP | typeof FILL;
 
-export interface Stroke { pts: Pt[]; closed: boolean }
+export interface Stroke {
+  pts: Pt[];
+  closed: boolean;
+  /** Set on a stroke that paints an area: the width of its pen, in the stroke's own units. */
+  fill?: number;
+}
+
+/** A copy of `s` with other points, keeping what kind of stroke it is. */
+export const withPts = (s: Stroke, pts: Pt[], closed = s.closed): Stroke => (s.fill ? { pts, closed, fill: s.fill } : { pts, closed });
 
 /** How one stroke is walked in a path: its index, its direction, and (closed strokes only) the vertex it starts at. */
 export interface TourStep { index: number; reversed: boolean; start: number }
@@ -22,7 +32,9 @@ export interface PathResult {
   cum: Float64Array;
   total: number;
   /** Total length of each kind of segment, indexed by SegKind. */
-  lengths: [number, number, number];
+  lengths: [number, number, number, number];
+  /** The width of the pen that paints areas (the widest of the strokes'), 0 when nothing is painted. */
+  fillWidth: number;
 }
 
 export type PathErrorCode = 'empty' | 'too-few-points' | 'zero-length';
@@ -46,7 +58,7 @@ export function cleanStroke(stroke: Stroke): Stroke {
     if (pts.length === 0 || !same(pts[pts.length - 1], p)) pts.push([p[0], p[1]]);
   }
   if (stroke.closed && pts.length > 1 && same(pts[0], pts[pts.length - 1])) pts.pop();
-  return { pts, closed: stroke.closed && pts.length > 2 };
+  return withPts(stroke, pts, stroke.closed && pts.length > 2);
 }
 
 /** Clean every stroke and drop the ones without length; reject what spec §13 rejects. */
@@ -86,7 +98,10 @@ export function normalizeToUnit(strokes: Stroke[]): Stroke[] {
   const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
   const half = Math.max(b.maxX - b.minX, b.maxY - b.minY) / 2;
   const s = half > 0 ? 1 / half : 1;
-  return strokes.map(st => ({ closed: st.closed, pts: st.pts.map(([x, y]) => [(x - cx) * s, (y - cy) * s] as Pt) }));
+  return strokes.map(st => {
+    const pts = st.pts.map(([x, y]) => [(x - cx) * s, (y - cy) * s] as Pt);
+    return st.fill ? { pts, closed: st.closed, fill: st.fill * s } : { pts, closed: st.closed };
+  });
 }
 
 /** The points of one stroke in walking order. A closed stroke starts at `start` and comes back to it. */
@@ -119,11 +134,14 @@ export function buildPath(strokes: Stroke[], order: TourStep[] = identityOrder(s
     pts.push(p);
     arrive.push(kind);
   };
+  let fillWidth = 0;
   for (const step of order) {
-    orientedPoints(strokes[step.index], step).forEach((p, i) => push(p, i === 0 ? JUMP : INK));
+    const stroke = strokes[step.index], kind = stroke.fill ? FILL : INK;
+    if (stroke.fill) fillWidth = Math.max(fillWidth, stroke.fill);
+    orientedPoints(stroke, step).forEach((p, i) => push(p, i === 0 ? JUMP : kind));
   }
   const only = order.length === 1 ? strokes[order[0].index] : null;
-  let closing: SegKind = only ? (only.closed ? INK : CLOSURE) : JUMP;
+  let closing: SegKind = only ? (only.closed ? (only.fill ? FILL : INK) : CLOSURE) : JUMP;
   if (pts.length > 1 && same(pts[pts.length - 1], pts[0])) {
     closing = arrive[arrive.length - 1];
     pts.pop();
@@ -135,7 +153,7 @@ export function buildPath(strokes: Stroke[], order: TourStep[] = identityOrder(s
   kinds[n - 1] = closing;
 
   const cum = new Float64Array(n + 1);
-  const lengths: [number, number, number] = [0, 0, 0];
+  const lengths: [number, number, number, number] = [0, 0, 0, 0];
   for (let i = 0; i < n; i++) {
     const a = pts[i], b = pts[(i + 1) % n];
     const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -144,7 +162,7 @@ export function buildPath(strokes: Stroke[], order: TourStep[] = identityOrder(s
   }
   const total = cum[n];
   if (!(total > 0)) throw new PathError('zero-length');
-  return { poly: pts, kinds, cum, total, lengths };
+  return { poly: pts, kinds, cum, total, lengths, fillWidth };
 }
 
 /**

@@ -119,7 +119,14 @@ describe('flipbook (spec §8)', () => {
   });
 
   it('the PDF has 4 A4 pages and asks not to be scaled when printed', async () => {
-    const art = (t: number) => ({ trail: [[[0, 0], [t, t]] as [number, number][]], circles: [{ x: 0, y: 0, r: 0.5 }], arms: [[0, 0], [0.5, 0]] as [number, number][], tip: [t, t] as [number, number] });
+    const art = (t: number) => ({
+      trail: [[[0, 0], [t, t]] as [number, number][]],
+      paint: [[[0, 0], [-t, t]] as [number, number][]],
+      fillWidth: 0.05,
+      circles: [{ x: 0, y: 0, r: 0.5 }],
+      arms: [[0, 0], [0.5, 0]] as [number, number][],
+      tip: [t, t] as [number, number],
+    });
     const bytes = await exportFlipbook(art, layout, { half: 1.35 });
     const { PDFDocument, PDFName } = await import('pdf-lib');
     const doc = await PDFDocument.load(bytes);

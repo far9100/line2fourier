@@ -1,6 +1,6 @@
 // Spec §13: too many strokes (> 2000) or too many points are announced and simplified.
 import type { Pt } from './fourier.ts';
-import type { Stroke } from './path.ts';
+import { withPts, type Stroke } from './path.ts';
 
 /** Douglas–Peucker on an open polyline, without recursion; the end points are always kept. */
 export function douglasPeucker(pts: Pt[], eps: number): Pt[] {
@@ -48,7 +48,7 @@ export function simplifyDrawing(strokes: Stroke[], size: number, limits = LIMITS
   let epsilon = 0;
   while (count(kept) > limits.maxPoints) {
     epsilon = epsilon ? epsilon * 2 : size * 1e-4;
-    kept = kept.map(s => ({ closed: s.closed, pts: douglasPeucker(s.pts, epsilon) }));
+    kept = kept.map(s => withPts(s, douglasPeucker(s.pts, epsilon)));
   }
   return { strokes: kept, droppedStrokes, epsilon };
 }

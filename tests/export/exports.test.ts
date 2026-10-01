@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chainAt, coefficients, orderTerms, partialCurve, resampleClosed, type Pt, type Term } from '../../src/core/fourier.ts';
 import { generate } from '../../src/core/generators.ts';
-import { CLOSURE, JUMP, buildPath, kindSpans, prepareStrokes, samplePath } from '../../src/core/path.ts';
+import { CLOSURE, FILL, JUMP, buildPath, kindSpans, prepareStrokes, samplePath } from '../../src/core/path.ts';
 import { SLIDER_MIN_TERMS, toDesmos, toDesmosSlider } from '../../src/export/desmos.ts';
 import { toCoefficientsJson, type CoefficientsFile } from '../../src/export/json.ts';
 import { toLatex, toLatexPreview } from '../../src/export/latex.ts';
@@ -123,11 +123,11 @@ describe('coefficients JSON (spec §8)', () => {
 describe('SVG (spec §8)', () => {
   function svgFor(strokes: Parameters<typeof buildPath>[0], M: number, widthMm = 120) {
     const path = buildPath(prepareStrokes(strokes));
-    const spans = { jump: kindSpans(path, JUMP), closure: kindSpans(path, CLOSURE) };
+    const spans = { jump: kindSpans(path, JUMP), closure: kindSpans(path, CLOSURE), fill: kindSpans(path, FILL) };
     const s = samplePath(path, N);
     const o = orderTerms(coefficients(s.pts));
     const approx = partialCurve(o.c0, o.terms, M, N);
-    const ev = curveEvents(approx, spans, t => tipAt(o.c0, o.terms, M, t));
+    const ev = curveEvents(approx, spans, t => tipAt(o.c0, o.terms, M, t), path.fillWidth);
     return toSvg(ev, { widthMm, strokeMm: 0.3 });
   }
 
@@ -149,6 +149,18 @@ describe('SVG (spec §8)', () => {
     ];
     const d = svgFor(strokes, N - 1).match(/ d="([^"]+)"/)![1];
     expect(d.match(/M/g)).toHaveLength(3);
+  });
+
+  it('a painted area is a second path, under the lines, drawn with the wide pen (D42)', () => {
+    const strokes = [
+      { pts: [[0, 0], [4, 0], [4, 4], [0, 4]] as Pt[], closed: true },
+      { pts: [[1, 1], [3, 1], [3, 3], [1, 3]] as Pt[], closed: true, fill: 0.5 },
+    ];
+    const svg = svgFor(strokes, N - 1);
+    const widths = [...svg.matchAll(/<path [^>]*stroke-width="([\d.]+)"/g)].map(m => Number(m[1]));
+    expect(widths).toHaveLength(2);
+    expect(widths[0]).toBeCloseTo(0.5, 4); // the painted area first, so the lines stay on top
+    expect(widths[1]).toBeLessThan(0.5);
   });
 
   it('flips y so that up in the drawing is up on paper', () => {

@@ -59,6 +59,13 @@ describe('joining ends that nearly meet', () => {
     expect(a.strokes).toHaveLength(2);
   });
 
+  it('strokes that paint an area are never joined (D42)', () => {
+    const paint: Stroke = { pts: [[10.2, 0], [20, 0]], closed: false, fill: 1 };
+    const r = bridgeEnds([open([0, 0], [10, 0]), paint], 1);
+    expect(r.bridges).toBe(0);
+    expect(r.strokes[1]).toBe(paint);
+  });
+
   it('eps is half a percent of the drawing', () => {
     expect(BRIDGE_SHARE).toBe(0.005);
     expect(bridgeEnds([open([0, 0], [1, 0])], 0).bridges).toBe(0);

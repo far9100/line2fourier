@@ -2,7 +2,9 @@
 // (line2func/curves.py, docs/details.md): image pixels with y down; a flat list of cubic Bézier
 // curves, ctrl = [P0, P1, P2, P3]; consecutive curves with the same `stroke` id join end to end;
 // a stroke is closed when its last P3 is its first P0. Curves tagged `fill` are the hatching
-// line2func draws inside filled areas, left out unless asked for (DECISIONS.md D27).
+// line2func draws inside filled areas, left out unless asked for (DECISIONS.md D27); the areas
+// themselves, the closed strokes tagged `fill_outline`, are painted here instead (D42).
+import { fillSpacing, paintAreas, rasterizeLoops } from './fill.ts';
 import type { Pt } from './fourier.ts';
 import type { Stroke } from './path.ts';
 
@@ -44,20 +46,27 @@ function bezier(c: [Pt, Pt, Pt, Pt], t: number): Pt {
 
 const dist = (p: Pt, q: Pt) => Math.hypot(p[0] - q[0], p[1] - q[1]);
 
+/** The longest side of the grid the filled areas are painted on, as for pictures (core/raster.ts). */
+const PAINT_SIDE = 1024;
+
 /**
  * Sample every curve in proportion to the length of its control polygon (about one point per
- * 1/500 of the image's diagonal, 2 to 64 per curve), join the curves of a stroke, flip y.
+ * 1/500 of the image's diagonal, 2 to 64 per curve), join the curves of a stroke, flip y. The
+ * filled areas are painted in (their hatching left out), unless the hatching is asked for.
  */
-export function curvesToStrokes(doc: CurvesJson, opts: { includeFill?: boolean } = {}): { strokes: Stroke[]; skippedFill: number } {
+export function curvesToStrokes(doc: CurvesJson, opts: { includeFill?: boolean } = {}): { strokes: Stroke[]; skippedFill: number; filled: number } {
   const { width, height } = doc.image;
   const step = Math.hypot(width, height) / 500;
   const strokes: Stroke[] = [];
+  const areas: Pt[][] = [];
   let skippedFill = 0;
-  let cur: { id: number; pts: Pt[] } | null = null;
+  let cur: { id: number; pts: Pt[]; area: boolean } | null = null;
   const finish = () => {
     if (cur && cur.pts.length > 1) {
       const closed = dist(cur.pts[0], cur.pts[cur.pts.length - 1]) < 1e-6;
-      strokes.push({ closed, pts: cur.pts.map(([x, y]) => [x, height - y] as Pt) });
+      const pts = cur.pts.map(([x, y]) => [x, height - y] as Pt);
+      strokes.push({ closed, pts });
+      if (closed && cur.area) areas.push(pts);
     }
     cur = null;
   };
@@ -68,12 +77,25 @@ export function curvesToStrokes(doc: CurvesJson, opts: { includeFill?: boolean }
     // A new stroke when the id changes, or when this piece does not start where the last one ended.
     if (!cur || cur.id !== id || dist(cur.pts[cur.pts.length - 1], c[0]) > 1e-6) {
       finish();
-      cur = { id, pts: [c[0]] };
+      cur = { id, pts: [c[0]], area: false };
     }
+    if (curve.tags?.includes('fill_outline')) cur.area = true;
     const poly = dist(c[0], c[1]) + dist(c[1], c[2]) + dist(c[2], c[3]);
     const n = Math.min(64, Math.max(2, Math.ceil(poly / step)));
     for (let k = 1; k <= n; k++) cur.pts.push(bezier(c, k / n));
   }
   finish();
-  return { strokes, skippedFill };
+  if (opts.includeFill || areas.length === 0) return { strokes, skippedFill, filled: 0 };
+
+  // Paint the areas on a grid at most PAINT_SIDE pixels long (the outlines are y up already).
+  const scale = Math.min(1, PAINT_SIDE / Math.max(width, height));
+  const gw = Math.max(1, Math.ceil(width * scale)), gh = Math.max(1, Math.ceil(height * scale));
+  const mask = rasterizeLoops(areas.map(loop => loop.map(([x, y]) => [x * scale, y * scale] as Pt)), gw, gh);
+  let area = 0;
+  for (const b of mask) area += b;
+  const painted = paintAreas(mask, gw, gh, fillSpacing(area, Math.max(gw, gh)));
+  for (const s of painted.strokes) {
+    strokes.push({ pts: s.pts.map(([x, y]) => [x / scale, y / scale] as Pt), closed: true, fill: s.fill! / scale });
+  }
+  return { strokes, skippedFill, filled: painted.areas };
 }

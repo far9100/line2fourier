@@ -8,8 +8,11 @@ import { N_CHOICES, SPEEDS, type NSize } from '../core/ticks.ts';
 import { ZOOM_MAX, type AppState, type ImportKind, type ViewState } from './state.ts';
 
 export const PROJECT_FORMAT = 'line2fourier.project';
-/** 2: imports join near ends (D38); images outline solid areas and walk Euler trails (D39, D40). */
-export const ENGINE = 2;
+/**
+ * 2: imports join near ends (D38); images outline solid areas and walk Euler trails (D39, D40).
+ * 3: solid areas of pictures and line2func's filled areas are painted in (D42).
+ */
+export const ENGINE = 3;
 
 /**
  * The source as saved: an imported file is kept by name and SHA-256, and its text only when the

@@ -84,6 +84,9 @@ export function flipbookLayout(frames = 32): Layout {
 /** What one frame shows, in world units: the trail so far (pen-down pieces), the circles, the arms and the pen. */
 export interface FrameArt {
   trail: Pt[][];
+  /** The pieces of the trail that paint an area, drawn fillWidth wide. */
+  paint: Pt[][];
+  fillWidth: number;
   circles: { x: number; y: number; r: number }[];
   arms: Pt[];
   tip: Pt;
@@ -98,7 +101,7 @@ export interface FlipbookOptions {
 }
 
 export async function exportFlipbook(artAt: (t: number) => FrameArt, layout: Layout, opt: FlipbookOptions): Promise<Uint8Array> {
-  const { PDFDocument, PrintScaling, StandardFonts, rgb } = await import('pdf-lib');
+  const { LineCapStyle, PDFDocument, PrintScaling, StandardFonts, rgb } = await import('pdf-lib');
   const doc = await PDFDocument.create();
   doc.setTitle(opt.title ?? 'line2fourier flipbook');
   doc.setProducer('line2fourier');
@@ -141,6 +144,8 @@ export async function exportFlipbook(artAt: (t: number) => FrameArt, layout: Lay
       page.drawCircle({ x: pt(x), y: pt(H - y), size: pt(s * circle.r), borderColor: grey, borderWidth: 0.25 });
     }
     if (art.arms.length > 1) page.drawSvgPath(path(art.arms), { ...svg, borderColor: ink, borderWidth: 0.3 });
+    const paintWidth = Math.max(0.8, s * art.fillWidth); // mm: drawSvgPath scales the line width too
+    for (const piece of art.paint) if (piece.length > 1) page.drawSvgPath(path(piece), { ...svg, borderColor: brass, borderWidth: paintWidth, borderLineCap: LineCapStyle.Round });
     for (const piece of art.trail) if (piece.length > 1) page.drawSvgPath(path(piece), { ...svg, borderColor: brass, borderWidth: 0.8 });
     page.drawCircle({ x: pt(X(art.tip[0])), y: pt(H - Y(art.tip[1])), size: 1.6, color: brass });
   }

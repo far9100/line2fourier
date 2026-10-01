@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coefficients, orderTerms, partialCurve, type Pt } from '../../src/core/fourier.ts';
-import { CLOSURE, INK, JUMP, buildPath, kindSpans, samplePath, type Stroke } from '../../src/core/path.ts';
+import { CLOSURE, FILL, INK, JUMP, buildPath, kindSpans, samplePath, type Stroke } from '../../src/core/path.ts';
 import { makeCamera, toScreen, toWorld } from '../../src/render/camera.ts';
 import { curveEvents, kindAt, tipAt, traceCurve, type PathSink } from '../../src/render/curve.ts';
 
@@ -19,7 +19,7 @@ const strokes: Stroke[] = [
   { pts: [[3, 0], [4, 1]], closed: false },
 ];
 const path = buildPath(strokes);
-const spans = { jump: kindSpans(path, JUMP), closure: kindSpans(path, CLOSURE) };
+const spans = { jump: kindSpans(path, JUMP), closure: kindSpans(path, CLOSURE), fill: kindSpans(path, FILL) };
 const N = 256;
 const s = samplePath(path, N);
 const o = orderTerms(coefficients(s.pts));
@@ -60,7 +60,7 @@ describe('tracing the curve', () => {
 
   it('a single open stroke has its closing line traced separately', () => {
     const p = buildPath([{ pts: [[0, 0], [2, 0], [1, 1.5]], closed: false }]);
-    const sp = { jump: kindSpans(p, JUMP), closure: kindSpans(p, CLOSURE) };
+    const sp = { jump: kindSpans(p, JUMP), closure: kindSpans(p, CLOSURE), fill: kindSpans(p, FILL) };
     const sm = samplePath(p, 128);
     const oo = orderTerms(coefficients(sm.pts));
     const e = curveEvents(partialCurve(oo.c0, oo.terms, 20, 128), sp, t => tipAt(oo.c0, oo.terms, 20, t));
@@ -70,6 +70,25 @@ describe('tracing the curve', () => {
     expect(closure.lines).toHaveLength(1);
     // The two pieces meet: the closure starts where the ink stops.
     expect(closure.lines[0][0]).toEqual(ink.lines[0][ink.lines[0].length - 1]);
+  });
+
+  it('the stretches that paint an area go to their own sink, with the pen width (D42)', () => {
+    const p = buildPath([
+      { pts: [[0, 0], [2, 0], [2, 2]], closed: false },
+      { pts: [[3, 0], [4, 0], [4, 1], [3, 1]], closed: true, fill: 0.25 },
+    ]);
+    const sp = { jump: kindSpans(p, JUMP), closure: kindSpans(p, CLOSURE), fill: kindSpans(p, FILL) };
+    expect(sp.fill).toHaveLength(1);
+    const sm = samplePath(p, 256);
+    const oo = orderTerms(coefficients(sm.pts));
+    const e = curveEvents(partialCurve(oo.c0, oo.terms, 255, 256), sp, t => tipAt(oo.c0, oo.terms, 255, t), p.fillWidth);
+    expect(e.fillWidth).toBe(0.25);
+    expect(kindAt(sp, (sp.fill[0][0] + sp.fill[0][1]) / 2)).toBe(FILL);
+    const ink = recorder(), closure = recorder(), fill = recorder();
+    traceCurve(e, 1, null, ink.sink, closure.sink, fill.sink);
+    expect(ink.lines).toHaveLength(1);
+    expect(fill.lines).toHaveLength(1);
+    for (const [x] of fill.lines[0]) expect(x).toBeGreaterThan(2.5);
   });
 
   it('a trail stops at the pen, wherever it is', () => {

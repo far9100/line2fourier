@@ -4,7 +4,7 @@
 // from both and the shorter wins. Budgets are counted in passes and evaluations, not in time, so the
 // same strokes always give the same tour (spec §10; DECISIONS.md D26).
 import type { Pt } from './fourier.ts';
-import type { Stroke, TourStep } from './path.ts';
+import { withPts, type Stroke, type TourStep } from './path.ts';
 
 export interface Tour {
   steps: TourStep[];
@@ -157,11 +157,11 @@ export function optimizeTour(strokes: Stroke[], opts: TourOptions = {}): Tour {
 export function applyTour(strokes: Stroke[], steps: TourStep[]): Stroke[] {
   return steps.map(st => {
     const s = strokes[st.index];
-    if (!s.closed) return { closed: false, pts: st.reversed ? s.pts.slice().reverse() : s.pts.slice() };
-    if (steps.length === 1) return { closed: true, pts: s.pts.slice() };
+    if (!s.closed) return withPts(s, st.reversed ? s.pts.slice().reverse() : s.pts.slice());
+    if (steps.length === 1) return withPts(s, s.pts.slice());
     const n = s.pts.length;
     const pts: Pt[] = [];
     for (let k = 0; k <= n; k++) pts.push(s.pts[(st.start + k) % n]);
-    return { closed: false, pts };
+    return withPts(s, pts, false);
   });
 }

@@ -5,14 +5,15 @@ import type { Stroke } from '../core/path.ts';
 import { rasterToStrokes } from '../core/raster.ts';
 import { optimizeTour, type Tour, type TourOptions } from '../core/tour.ts';
 
-export interface Packed { xy: Float64Array; offsets: Uint32Array; closed: Uint8Array }
+/** fill[i] is stroke i's pen width when it paints an area, 0 when it is a line. */
+export interface Packed { xy: Float64Array; offsets: Uint32Array; closed: Uint8Array; fill: Float64Array }
 
 export function pack(strokes: Stroke[]): Packed {
   const offsets = new Uint32Array(strokes.length + 1);
   strokes.forEach((s, i) => { offsets[i + 1] = offsets[i] + s.pts.length; });
   const xy = new Float64Array(2 * offsets[strokes.length]);
   strokes.forEach((s, i) => s.pts.forEach(([x, y], k) => { xy[2 * (offsets[i] + k)] = x; xy[2 * (offsets[i] + k) + 1] = y; }));
-  return { xy, offsets, closed: Uint8Array.from(strokes, s => (s.closed ? 1 : 0)) };
+  return { xy, offsets, closed: Uint8Array.from(strokes, s => (s.closed ? 1 : 0)), fill: Float64Array.from(strokes, s => s.fill ?? 0) };
 }
 
 export function unpack(p: Packed): Stroke[] {
@@ -20,7 +21,7 @@ export function unpack(p: Packed): Stroke[] {
   for (let i = 0; i + 1 < p.offsets.length; i++) {
     const pts: Pt[] = [];
     for (let k = p.offsets[i]; k < p.offsets[i + 1]; k++) pts.push([p.xy[2 * k], p.xy[2 * k + 1]]);
-    out.push({ pts, closed: p.closed[i] === 1 });
+    out.push(p.fill[i] > 0 ? { pts, closed: p.closed[i] === 1, fill: p.fill[i] } : { pts, closed: p.closed[i] === 1 });
   }
   return out;
 }

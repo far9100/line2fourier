@@ -52,13 +52,16 @@ export function frameArt(scene: Scene, t: number): FrameArt {
   const joints = new Float64Array(2 * M + 2);
   chainInto(c0, terms, M, t, joints);
   const tip: Pt = [joints[2 * M], joints[2 * M + 1]];
-  const trail: Pt[][] = [];
-  const sink = { moveTo: (x: number, y: number) => { trail.push([[x, y]]); }, lineTo: (x: number, y: number) => { trail[trail.length - 1].push([x, y]); } };
-  traceCurve(scene.events, t, tip, sink, sink);
+  const trail: Pt[][] = [], paint: Pt[][] = [];
+  const into = (pieces: Pt[][]) => ({
+    moveTo: (x: number, y: number) => { pieces.push([[x, y]]); },
+    lineTo: (x: number, y: number) => { pieces[pieces.length - 1].push([x, y]); },
+  });
+  traceCurve(scene.events, t, tip, into(trail), into(trail), into(paint));
   const arms: Pt[] = [[0, 0]];
   for (let j = 0; j <= M; j++) arms.push([joints[2 * j], joints[2 * j + 1]]);
   const circles = terms.slice(0, M).map((c, j) => ({ x: joints[2 * j], y: joints[2 * j + 1], r: c.amp }));
-  return { trail, circles, arms, tip };
+  return { trail, paint, fillWidth: scene.events.fillWidth, circles, arms, tip };
 }
 
 export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void } {

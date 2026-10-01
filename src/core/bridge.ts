@@ -2,7 +2,8 @@
 // gaps where lines meet (line2func trims every stroke at a junction; thresholding breaks faint
 // lines), and every gap costs a pen lift. A gap at most `eps` wide is crossed with a short drawn
 // segment instead: the ends are paired nearest first, chains never close back on themselves
-// through a bridge, and a chain whose two ends end up within eps is closed.
+// through a bridge, and a chain whose two ends end up within eps is closed. Strokes that paint an
+// area (D42) are left as they are.
 import type { Pt } from './fourier.ts';
 import type { Stroke } from './path.ts';
 
@@ -24,7 +25,7 @@ export function bridgeEnds(input: Stroke[], eps: number): Bridged {
   if (!(eps > 0) || n === 0) return { strokes: input, bridges: 0, length: 0, closed: 0 };
   // End k belongs to stroke k >> 1: k & 1 = 0 its first point, 1 its last.
   const endPt = (k: number): Pt => { const s = input[k >> 1]; return k & 1 ? s.pts[s.pts.length - 1] : s.pts[0]; };
-  const open = (k: number) => !input[k >> 1].closed && input[k >> 1].pts.length > 1;
+  const open = (k: number) => !input[k >> 1].closed && !input[k >> 1].fill && input[k >> 1].pts.length > 1;
   const cell = new Map<string, number[]>();
   const key = (x: number, y: number) => `${Math.floor(x / eps)},${Math.floor(y / eps)}`;
   for (let k = 0; k < 2 * n; k++) {
@@ -68,7 +69,7 @@ export function bridgeEnds(input: Stroke[], eps: number): Bridged {
   for (let k = 0; k < 2 * n; k++) {
     const i = k >> 1;
     if (seen[i]) continue;
-    if (input[i].closed || input[i].pts.length < 2) { seen[i] = 1; out.push(input[i]); continue; }
+    if (!open(2 * i)) { seen[i] = 1; out.push(input[i]); continue; }
     if (partner[k] >= 0) continue; // not a free end: the chain is entered from its other end
     const pts: Pt[] = [];
     for (let e = k; e >= 0 && !seen[e >> 1];) {
@@ -86,7 +87,7 @@ export function bridgeEnds(input: Stroke[], eps: number): Bridged {
 function closeNear(strokes: Stroke[], eps: number, bridges: number, length = 0): Bridged {
   let closed = 0;
   const out = strokes.map(s => {
-    if (s.closed || s.pts.length < 3) return s;
+    if (s.closed || s.fill || s.pts.length < 3) return s;
     const a = s.pts[0], b = s.pts[s.pts.length - 1];
     if (Math.hypot(a[0] - b[0], a[1] - b[1]) > eps) return s;
     closed++;

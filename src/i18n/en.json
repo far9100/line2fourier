@@ -185,9 +185,9 @@
     "one": "Joined {n} small gap, so the pen lifts less often.",
     "other": "Joined {n} small gaps, so the pen lifts less often."
   },
-  "raster.outlined": {
-    "one": "{n} solid area is drawn by its outline.",
-    "other": "{n} solid areas are drawn by their outlines."
-  },
-  "project.olderEngine": "This project was made by an earlier version; this version traces its imported drawing a little differently."
+  "project.olderEngine": "This project was made by an earlier version; this version traces its imported drawing a little differently.",
+  "import.filled": {
+    "one": "{n} solid area is painted in, as in the picture.",
+    "other": "{n} solid areas are painted in, as in the picture."
+  }
 }
