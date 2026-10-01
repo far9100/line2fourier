@@ -3,7 +3,8 @@ import 'katex/dist/katex.min.css';
 import './styles/main.css';
 import { advance, cycleMs } from './app/clock.ts';
 import { createPipeline, type Computed, type Ordered } from './app/pipeline.ts';
-import { detectKind, prepareImport, sha256Hex } from './app/importer.ts';
+import { bytesToDataUrl, dataUrlToBytes, decodeImage } from './app/image.ts';
+import { detectKind, finishImport, imageStrokes, prepareImport, sha256Hex, type Prepared } from './app/importer.ts';
 import { parseProject, projectText, type ProjectFile } from './app/project.ts';
 import { defaultState, normalizeState, type AppState, type ImportKind, type ImportedSource, type SourceSpec } from './app/state.ts';
 import { createStore } from './app/store.ts';
@@ -25,6 +26,7 @@ import { formatEnergy, formatShare } from './ui/format.ts';
 import { renderMath } from './ui/formula.ts';
 import { startFreehand } from './ui/freehand.ts';
 import { bindKeys } from './ui/keyboard.ts';
+import { mountOutputs } from './ui/outputs.ts';
 import { toast } from './ui/toast.ts';
 import { createWorkerClient } from './worker/client.ts';
 
@@ -65,6 +67,7 @@ const view = new CanvasView($<HTMLCanvasElement>('#view'), () => {
   dirty = true;
   spectrumView.style = view.style;
   spectrumView.draw();
+  outputs.update();
 });
 const spectrumView = new SpectrumView($<HTMLCanvasElement>('#spectrum'), view.style);
 const worker = createWorkerClient();
@@ -133,6 +136,7 @@ function frame(now: number): void {
     timings.render = 0.9 * timings.render + 0.1 * (performance.now() - started);
     dirty = false;
   }
+  outputs.frame();
   requestAnimationFrame(frame);
 }
 
@@ -361,38 +365,63 @@ type Settings = Pick<ProjectFile, 'N' | 'M' | 'order' | 'speed' | 'view'>;
 let relink: { kind: ImportKind; sha256: string; settings: Settings } | null = null;
 
 async function openFile(file: File): Promise<void> {
+  if (detectKind(file.name, '', file.type) === 'image') {
+    await openImage(file.name, new Uint8Array(await file.arrayBuffer()), file.type);
+    return;
+  }
   const text = await file.text();
-  const kind = detectKind(file.name, text);
+  const kind = detectKind(file.name, text, file.type);
   if (kind === 'project') {
     relink = null;
     await openProject(text);
   } else if (kind === 'svg' || kind === 'line2func') {
-    const pending = relink;
-    relink = null;
-    if (pending && pending.kind === kind) {
-      if ((await sha256Hex(text)) !== pending.sha256) toast(t('project.hashMismatch'), 'error');
-      await importDrawing(kind, file.name, text, pending.settings);
-    } else {
-      await importDrawing(kind, file.name, text);
-    }
+    const settings = await takeRelink(kind, text);
+    await importDrawing({ kind, name: file.name, sha256: await sha256Hex(text), content: text }, () => prepareImport(kind, text, s => worker.tour(s)), settings);
   } else {
     toast(t('import.error.unknown'), 'error');
   }
 }
 
+/** The settings of a project waiting for this file, if it is the kind it waits for (the hash is checked, not required). */
+async function takeRelink(kind: ImportKind, data: string | Uint8Array): Promise<Settings | undefined> {
+  const pending = relink;
+  relink = null;
+  if (!pending || pending.kind !== kind) return undefined;
+  if ((await sha256Hex(data)) !== pending.sha256) toast(t('project.hashMismatch'), 'error');
+  return pending.settings;
+}
+
+/** Spec §5.5: the browser decodes the image; thinning and tracing run in the worker. */
+async function openImage(name: string, bytes: Uint8Array, mime: string, settings?: Settings): Promise<void> {
+  settings ??= await takeRelink('image', bytes);
+  const sha256 = await sha256Hex(bytes);
+  await importDrawing({ kind: 'image', name, sha256, content: bytesToDataUrl(bytes, mime) }, async () => {
+    let img;
+    try {
+      img = await decodeImage(bytes, mime);
+    } catch {
+      return { error: 'import.error.image' };
+    }
+    const traced = await worker.raster(img.data, img.width, img.height);
+    return finishImport(imageStrokes(traced.strokes, traced.h), { ...traced.warnings }, s => worker.tour(s));
+  }, settings);
+}
+
 let importing = 0;
 
-async function importDrawing(kind: ImportKind, name: string, text: string, settings?: Settings): Promise<void> {
+interface Incoming { kind: ImportKind; name: string; sha256: string; content: string }
+
+async function importDrawing(file: Incoming, prepare: () => Promise<Prepared | { error: string }>, settings?: Settings): Promise<void> {
   const ticket = ++importing;
   toast(t('import.working'), '', true);
-  const prepared = await prepareImport(kind, text, s => worker.tour(s));
+  const prepared = await prepare();
   if (ticket !== importing) return; // a later file was opened meanwhile
   if ('error' in prepared) {
     toast(t(prepared.error), 'error');
     return;
   }
   const source: ImportedSource = {
-    type: kind, name, sha256: await sha256Hex(text), content: text,
+    type: file.kind, name: file.name, sha256: file.sha256, content: file.content,
     strokes: prepared.strokes, originalJumpRatio: prepared.originalJumpRatio,
   };
   tCycle = 0;
@@ -406,7 +435,7 @@ async function importDrawing(kind: ImportKind, name: string, text: string, setti
   }
   const s = store.get();
   const notes = Object.entries(prepared.warnings).map(([key, n]) => t(key, { n }));
-  toast([t('import.done', { name, strokes: prepared.strokeCount, N: String(s.N), M: String(s.M) }), ...notes].join(' '), '');
+  toast([t('import.done', { name: file.name, strokes: prepared.strokeCount, N: String(s.N), M: String(s.M) }), ...notes].join(' '), '');
 }
 
 async function openProject(text: string): Promise<void> {
@@ -429,8 +458,19 @@ async function openProject(text: string): Promise<void> {
     toast(t('project.needFile', { name: src.name }), '', true);
     return;
   }
-  if ((await sha256Hex(src.content)) !== src.sha256) toast(t('project.hashMismatch'), 'error');
-  await importDrawing(src.type, src.name, src.content, settings);
+  if (src.type === 'image') {
+    const decoded = dataUrlToBytes(src.content);
+    if (!decoded) {
+      toast(t('project.error.source'), 'error');
+      return;
+    }
+    if ((await sha256Hex(decoded.bytes)) !== src.sha256) toast(t('project.hashMismatch'), 'error');
+    await openImage(src.name, decoded.bytes, decoded.mime, settings);
+    return;
+  }
+  const kind = src.type, content = src.content;
+  if ((await sha256Hex(content)) !== src.sha256) toast(t('project.hashMismatch'), 'error');
+  await importDrawing({ kind, name: src.name, sha256: src.sha256, content }, () => prepareImport(kind, content, s => worker.tour(s)), settings);
 }
 
 // Files dropped anywhere on the page, or pasted (after line2func's viewer/app.js).
@@ -576,7 +616,10 @@ function showAll(s: AppState): void {
   showMetrics();
   showFormula(s);
   showSpectrum(s);
+  outputs.update();
 }
+
+const outputs = mountOutputs({ state: () => store.get(), computed: () => computed, scene: () => view.scene, style: () => view.style });
 
 store.subscribe((s, prev) => {
   if (s.lang !== prev.lang) {

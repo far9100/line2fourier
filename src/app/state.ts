@@ -7,14 +7,14 @@ import type { Lang } from '../i18n/index.ts';
 
 export type { Lang };
 
-export type ImportKind = 'svg' | 'line2func';
+export type ImportKind = 'svg' | 'line2func' | 'image';
 
 /** An imported file, already prepared: its strokes are cleaned, normalized and in tour order. */
 export interface ImportedSource {
   type: ImportKind;
   name: string;
   sha256: string;
-  /** The file's text, kept so a project can embed it. */
+  /** The file's text (an image's as a data: URL), kept so a project can embed it. */
   content: string;
   strokes: Stroke[];
   /** Jump length / path length had the strokes been chained in the file's order (spec §4.6). */

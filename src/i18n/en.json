@@ -154,5 +154,31 @@
   "project.embed": "Include the source file",
   "project.needFile": "Choose the original file with Open a drawing: {name}",
   "project.hashMismatch": "This file differs from the one the project was saved with; the result may differ.",
-  "desmos.jumps": "Desmos also draws the pen-up jumps between strokes."
+  "desmos.jumps": "Desmos also draws the pen-up jumps between strokes.",
+  "outputs.title": "Make something",
+  "video.export": "Video of one cycle",
+  "video.cancel": "Cancel the video",
+  "video.progress": "Encoding the video… {p}% (click again to cancel)",
+  "video.done": "Video saved: exactly one cycle long.",
+  "video.approx": "This browser has no WebCodecs: the video was recorded in real time and its length may be slightly off.",
+  "video.failed": "Could not make the video: {reason}",
+  "flipbook.export": "Flipbook (PDF)",
+  "flipbook.note": "Print at 100% (actual size), cut along the marks, stack the cards in order and staple the strip on the left.",
+  "flipbook.done": "Flipbook saved: 32 frames on 4 A4 pages.",
+  "scope.title": "Oscilloscope audio",
+  "scope.preview": "XY preview: what an oscilloscope in XY mode draws",
+  "scope.f0": "Base frequency",
+  "scope.volume": "Volume",
+  "scope.play": "Play",
+  "scope.stop": "Stop",
+  "scope.download": "Download WAV",
+  "scope.note": {
+    "one": "Left is x, right is y; {kept} circles used. {dropped} circle above {nyquist} Hz was left out ({energy} of the energy). Turn the volume down before playing.",
+    "other": "Left is x, right is y; {kept} circles used. {dropped} circles above {nyquist} Hz were left out ({energy} of the energy). Turn the volume down before playing."
+  },
+  "scope.noteAll": "Left is x, right is y; all {kept} circles can be played (up to {max} turns per cycle). Turn the volume down before playing.",
+  "import.error.image": "This image could not be read.",
+  "raster.inverted": "The image has light lines on a dark ground; it was inverted.",
+  "raster.photo": "This looks like a photo rather than line art. Trace it with line2func first and open its curves.json.",
+  "kind.image": "Image"
 }

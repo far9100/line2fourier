@@ -29,7 +29,11 @@ export default defineConfig({
   // Relative asset paths, so the build works from any folder (GitHub Pages serves it under /<repo>/).
   base: './',
   plugins: [contentSecurityPolicy()],
-  build: { target: 'es2022' },
+  build: {
+    target: 'es2022',
+    // pdf-lib (~420 kB) and mediabunny (~690 kB) are their own chunks, loaded only when exporting.
+    chunkSizeWarningLimit: 800,
+  },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',

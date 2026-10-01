@@ -134,7 +134,8 @@ describe('ordering strokes (spec §4.6, M2 acceptance)', () => {
     expect(unpack(pack(strokes))).toEqual(strokes);
     const res = handle({ id: 7, type: 'tour', strokes: pack(strokes) });
     expect(res).toMatchObject({ id: 7, ok: true });
-    if (res.ok) expect(res.tour).toEqual(optimizeTour(strokes));
+    if (res.ok && 'tour' in res) expect(res.tour).toEqual(optimizeTour(strokes));
+    else throw new Error('expected a tour');
   });
 
   const real = new URL('../../../line2func/out/curves.json', import.meta.url);

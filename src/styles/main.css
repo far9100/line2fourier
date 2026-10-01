@@ -231,6 +231,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--select); }
 .svg-row label { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--muted); }
 .svg-row input { width: 92px; }
 
+.card h3.sub { font-size: 13px; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+.scope-row { display: flex; gap: 12px; align-items: stretch; }
+#xy { width: 132px; height: 132px; flex: none; border-radius: 8px; border: 1px solid var(--line); }
+.scope-controls { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.scope-controls label { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--muted); }
+.scope-controls .buttons { margin-top: 2px; }
+#video-progress[hidden] { display: none; }
+
 .foot { padding: 4px 24px 28px; color: var(--muted); font-size: 13px; }
 .foot p { margin: 2px 0; }
 

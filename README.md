@@ -9,9 +9,9 @@
 
 ## English
 
-line2fourier takes a line drawing (a random doodle, one you draw, an SVG file, or the curves
-[line2func](https://github.com/far9100/Line-to-function) traced from an image) and writes the whole
-picture as a single Fourier series. Every term is a circle turning at its own constant speed; chained end to end,
+line2fourier takes a line drawing (a random doodle, one you draw, an SVG file, a picture of line
+art, or the curves [line2func](https://github.com/far9100/Line-to-function) traced from an image)
+and writes the whole picture as a single Fourier series. Every term is a circle turning at its own constant speed; chained end to end,
 the pen on the last circle draws the line again. Move a slider to use more or fewer circles and watch
 how close the drawing gets. Everything runs in your browser: nothing is uploaded.
 
@@ -50,8 +50,10 @@ npm run bench      # how long the maths takes (spec §6)
   back.
 - **Draw your own**: press and drag on the canvas, with a mouse, a finger or a pen, and let go. The
   line is closed with a straight segment, shown dashed.
-- **Open a drawing** takes an SVG file or line2func's `curves.json` (you can also drop a file on
-  the page or paste one). Every stroke is chained into one closed path; the pen-up jumps between
+- **Open a drawing** takes an SVG file, line2func's `curves.json` or a picture of line art (PNG,
+  JPEG, …; you can also drop a file on the page or paste one). A picture is thinned to
+  one-pixel lines and traced; for photos, trace them with line2func first and open its
+  `curves.json`. Every stroke is chained into one closed path; the pen-up jumps between
   strokes are computed with the rest but never drawn, and their order is chosen to keep them short.
   The number of samples and of circles is picked for the drawing; the card shows the pen-up share
   against the file's own order.
@@ -105,6 +107,14 @@ leaves out.
 
 Opening a project computes everything again and gives exactly the same result.
 
+### Making something
+
+| Output | What it is |
+|---|---|
+| Video | One cycle of the animation, exactly as long as a cycle, 1080 × 1080 at 30 fps (MP4, or WebM where the browser cannot encode H.264) |
+| Oscilloscope audio | Left channel x(t), right channel y(t): a scope in XY mode draws the picture. Plays in the page with a live XY preview; downloads as a 10-second 16-bit WAV. Terms too high for 48 kHz are left out and counted. Turn the volume down first |
+| Flipbook | 32 frames on 4 A4 pages: print at 100% (actual size), cut along the marks, stack in order and staple the strip on the left |
+
 ### The mathematics
 
 - Read a closed curve as a complex function z(t) = x(t) + i·y(t), t ∈ [0, 1); it can be written
@@ -135,7 +145,7 @@ Opening a project computes everything again and gives exactly the same result.
 
 ## 繁體中文
 
-line2fourier 把一張線稿（隨機產生的、你自己畫的、SVG 檔，或 [line2func](https://github.com/far9100/Line-to-function) 從圖片描出的曲線）寫成單獨一條傅立葉級數。每一項是一個以固定速度轉動的圓，把圓頭尾相接，最後一個圓上的筆尖就把線重新畫出來。拖動滑桿增減圓的數量，就能看到圖形逼近到什麼程度。所有運算都在瀏覽器裡完成，不會上傳任何資料。
+line2fourier 把一張線稿（隨機產生的、你自己畫的、SVG 檔、線稿圖片，或 [line2func](https://github.com/far9100/Line-to-function) 從圖片描出的曲線）寫成單獨一條傅立葉級數。每一項是一個以固定速度轉動的圓，把圓頭尾相接，最後一個圓上的筆尖就把線重新畫出來。拖動滑桿增減圓的數量，就能看到圖形逼近到什麼程度。所有運算都在瀏覽器裡完成，不會上傳任何資料。
 
 ```
 R=[0.70052,0.10247,0.09830]
@@ -167,7 +177,7 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 
 - 〔換一張線稿〕隨機產生小怪獸、塗鴉或尖角星形，旁邊的選單可以指定類型。〔更多設定〕裡會顯示種子，也可以輸入種子，畫出同一張線稿。
 - 〔自己畫〕：用滑鼠、手指或觸控筆在畫布上按住拖曳，放開就完成。線會用一段直線自動閉合，以虛線標示。
-- 〔上傳線稿〕可以開啟 SVG 檔或 line2func 的 `curves.json`（也可以直接把檔案拖進頁面或貼上）。所有筆畫會串成一條封閉路徑：筆畫之間的跳線照常參與計算，但不畫出來，順序也會重新安排，讓跳線盡量短。取樣點數與圓的數量會依圖自動選定；指標卡會顯示跳線比例，並與檔案原本的順序比較。
+- 〔上傳線稿〕可以開啟 SVG 檔、line2func 的 `curves.json` 或線稿圖片（PNG、JPEG 等；也可以直接把檔案拖進頁面或貼上）。圖片會先細線化成一像素寬，再追蹤成線條；照片請先用 line2func 描線，再開啟它的 `curves.json`。所有筆畫會串成一條封閉路徑：筆畫之間的跳線照常參與計算，但不畫出來，順序也會重新安排，讓跳線盡量短。取樣點數與圓的數量會依圖自動選定；指標卡會顯示跳線比例，並與檔案原本的順序比較。
 - 〔頻譜〕以對數刻度畫出 |c_k|，使用中的圓是黃銅色。點選一項（滑鼠或方向鍵），畫布上就會標出它的圓，並顯示 k、|c_k| 與 arg(c_k)。
 - 〔跟隨筆尖〕讓筆尖保持在畫面中央，最多放大 50 倍，連最小的圓都看得到。
 - 〔示範收斂〕依序用 1、2、3、5、10、20、50、100、300、1000 個圓，各畫一輪。
@@ -204,6 +214,14 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 | 專案 | 線稿（產生器與種子、你畫的點，或開啟的檔案名稱與 SHA-256；勾選〔內嵌原始檔〕時連檔案一起存）、N、M、排序、速度與檢視設定 |
 
 開啟專案時會重新計算，得到完全相同的結果。
+
+### 實體輸出
+
+| 輸出 | 內容 |
+|---|---|
+| 影片 | 一輪動畫，長度剛好一輪，1080 × 1080、30 fps（MP4；瀏覽器無法編 H.264 時為 WebM） |
+| 示波器音訊 | 左聲道 x(t)、右聲道 y(t)：示波器切到 XY 模式就會畫出這張圖。可在頁面上直接播放並即時預覽 XY 圖形，也可以下載 10 秒的 16-bit WAV。頻率超過 48 kHz 能表示範圍的項會被捨棄並顯示數量。播放前請先調低音量 |
+| 翻頁書 | 32 格分印在 4 頁 A4：以 100%（實際大小）列印，沿裁切線剪下，依序疊好，在左邊的裝訂邊釘起來 |
 
 ### 數學
 

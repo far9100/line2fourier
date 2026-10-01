@@ -77,7 +77,7 @@ function parseSource(v: unknown): SavedSource | null {
     if (!Array.isArray(v.points) || v.points.length < 2 || !v.points.every(isPt)) return null;
     return { type: 'freehand', points: (v.points as Pt[]).map(([x, y]) => [x, y]) };
   }
-  if (v.type === 'svg' || v.type === 'line2func') {
+  if (v.type === 'svg' || v.type === 'line2func' || v.type === 'image') {
     if (typeof v.name !== 'string' || typeof v.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(v.sha256)) return null;
     if (v.content !== undefined && typeof v.content !== 'string') return null;
     return { type: v.type, name: v.name, sha256: v.sha256, ...(typeof v.content === 'string' ? { content: v.content } : {}) };

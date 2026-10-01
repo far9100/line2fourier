@@ -19,7 +19,10 @@ describe('opening files', () => {
     expect(detectKind('p.json', '{"format":"line2fourier.project"}')).toBe('project');
     expect(detectKind('p.json', '{"version":1,"source":{}}')).toBe('project');
     expect(detectKind('x.json', '{"a":1}')).toBeNull();
-    expect(detectKind('x.png', '\u0089PNG')).toBeNull();
+    expect(detectKind('x.png', '\u0089PNG')).toBe('image');
+    expect(detectKind('photo', '', 'image/jpeg')).toBe('image');
+    expect(detectKind('drawing', '<svg/>', 'image/svg+xml')).toBe('svg');
+    expect(detectKind('notes.txt', 'hello')).toBeNull();
   });
 
   it('an SVG with several subpaths becomes ordered strokes in [-1, 1]², with N for its length', async () => {

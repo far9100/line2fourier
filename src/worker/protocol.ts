@@ -2,6 +2,7 @@
 // no per-point objects); handle() is a plain function, so tests call it without a worker.
 import type { Pt } from '../core/fourier.ts';
 import type { Stroke } from '../core/path.ts';
+import { rasterToStrokes } from '../core/raster.ts';
 import { optimizeTour, type Tour, type TourOptions } from '../core/tour.ts';
 
 export interface Packed { xy: Float64Array; offsets: Uint32Array; closed: Uint8Array }
@@ -24,13 +25,22 @@ export function unpack(p: Packed): Stroke[] {
   return out;
 }
 
-export type Request = { id: number; type: 'tour'; strokes: Packed; opts?: TourOptions };
+export type Request =
+  | { id: number; type: 'tour'; strokes: Packed; opts?: TourOptions }
+  | { id: number; type: 'raster'; rgba: Uint8ClampedArray; width: number; height: number };
 
-export type Response = { id: number; ok: true; tour: Tour } | { id: number; ok: false; error: string };
+export interface RasterReply { strokes: Packed; w: number; h: number; inkShare: number; warnings: Record<string, number> }
+
+export type Response =
+  | { id: number; ok: true; tour: Tour }
+  | { id: number; ok: true; raster: RasterReply }
+  | { id: number; ok: false; error: string };
 
 export function handle(req: Request): Response {
   try {
-    return { id: req.id, ok: true, tour: optimizeTour(unpack(req.strokes), req.opts) };
+    if (req.type === 'tour') return { id: req.id, ok: true, tour: optimizeTour(unpack(req.strokes), req.opts) };
+    const r = rasterToStrokes(req.rgba, req.width, req.height);
+    return { id: req.id, ok: true, raster: { strokes: pack(r.strokes), w: r.w, h: r.h, inkShare: r.inkShare, warnings: r.warnings } };
   } catch (e) {
     return { id: req.id, ok: false, error: e instanceof Error ? e.message : String(e) };
   }

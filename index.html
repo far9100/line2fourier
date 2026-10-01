@@ -162,6 +162,32 @@
         </div>
         <label class="embed" id="embed-row" hidden><input type="checkbox" id="embed-source"><span data-i18n="project.embed">Include the source file</span></label>
       </section>
+
+      <section class="card" aria-labelledby="outputs-title">
+        <h2 id="outputs-title" data-i18n="outputs.title">Make something</h2>
+        <div class="buttons">
+          <button type="button" id="video-export" data-i18n="video.export">Video of one cycle</button>
+          <button type="button" id="flipbook-export" data-i18n="flipbook.export">Flipbook (PDF)</button>
+        </div>
+        <p class="note" id="video-progress" aria-live="polite" hidden></p>
+        <h3 class="sub" data-i18n="scope.title">Oscilloscope audio</h3>
+        <div class="scope-row">
+          <canvas id="xy" role="img" aria-label="XY preview" data-i18n-aria-label="scope.preview"></canvas>
+          <div class="scope-controls">
+            <label><span data-i18n="scope.f0">Base frequency</span>
+              <select id="f0"></select>
+            </label>
+            <label><span data-i18n="scope.volume">Volume</span>
+              <input type="range" id="volume" min="0" max="100" step="1" value="15">
+            </label>
+            <div class="buttons">
+              <button type="button" id="audio-toggle" aria-pressed="false"><span id="audio-label" data-i18n="scope.play">Play</span></button>
+              <button type="button" id="wav-export" data-i18n="scope.download">WAV</button>
+            </div>
+          </div>
+        </div>
+        <p class="note" id="scope-note"></p>
+      </section>
     </aside>
   </main>
 
@@ -183,6 +209,6 @@
 
   <div id="drop-overlay" hidden><p data-i18n="drop.hint">Drop to open</p></div>
   <div id="toast" role="status" aria-live="polite" hidden></div>
-  <input type="file" id="file-input" accept=".svg,.json,image/svg+xml,application/json" hidden>
+  <input type="file" id="file-input" accept=".svg,.json,image/*,application/json" hidden>
 </body>
 </html>

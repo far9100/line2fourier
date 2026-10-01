@@ -2,9 +2,12 @@
 // it fails, the same handler runs on the main thread: slower, but the same result.
 import type { Stroke } from '../core/path.ts';
 import type { Tour, TourOptions } from '../core/tour.ts';
-import { handle, pack, type Request, type Response } from './protocol.ts';
+import { handle, pack, unpack, type RasterReply, type Request, type Response } from './protocol.ts';
 
-export interface WorkerClient { tour(strokes: Stroke[], opts?: TourOptions): Promise<Tour> }
+export interface WorkerClient {
+  tour(strokes: Stroke[], opts?: TourOptions): Promise<Tour>;
+  raster(rgba: Uint8ClampedArray, width: number, height: number): Promise<Omit<RasterReply, 'strokes'> & { strokes: Stroke[] }>;
+}
 
 export function createWorkerClient(): WorkerClient {
   let worker: Worker | null | undefined;
@@ -47,7 +50,14 @@ export function createWorkerClient(): WorkerClient {
     async tour(strokes, opts) {
       const res = await call({ id: nextId++, type: 'tour', strokes: pack(strokes), opts });
       if (!res.ok) throw new Error(res.error);
+      if (!('tour' in res)) throw new Error('unexpected reply');
       return res.tour;
+    },
+    async raster(rgba, width, height) {
+      const res = await call({ id: nextId++, type: 'raster', rgba, width, height });
+      if (!res.ok) throw new Error(res.error);
+      if (!('raster' in res)) throw new Error('unexpected reply');
+      return { ...res.raster, strokes: unpack(res.raster.strokes) };
     },
   };
 }
