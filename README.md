@@ -9,8 +9,9 @@
 
 ## English
 
-line2fourier takes a closed line, a random doodle or one you draw, and writes the whole picture as a
-single Fourier series. Every term is a circle turning at its own constant speed; chained end to end,
+line2fourier takes a line drawing (a random doodle, one you draw, an SVG file, or the curves
+[line2func](https://github.com/far9100/Line-to-function) traced from an image) and writes the whole
+picture as a single Fourier series. Every term is a circle turning at its own constant speed; chained end to end,
 the pen on the last circle draws the line again. Move a slider to use more or fewer circles and watch
 how close the drawing gets. Everything runs in your browser: nothing is uploaded.
 
@@ -49,6 +50,15 @@ npm run bench      # how long the maths takes (spec §6)
   back.
 - **Draw your own**: press and drag on the canvas, with a mouse, a finger or a pen, and let go. The
   line is closed with a straight segment, shown dashed.
+- **Open a drawing** takes an SVG file or line2func's `curves.json` (you can also drop a file on
+  the page or paste one). Every stroke is chained into one closed path; the pen-up jumps between
+  strokes are computed with the rest but never drawn, and their order is chosen to keep them short.
+  The number of samples and of circles is picked for the drawing; the card shows the pen-up share
+  against the file's own order.
+- **Spectrum** shows |c_k| on a log scale with the circles in use in brass. Pick a term (pointer or
+  arrow keys) to mark its circle on the canvas and read k, |c_k| and arg(c_k).
+- **Follow the pen** keeps the pen in the middle, magnified up to 50 times, so the smallest circles
+  can be seen.
 - **Show convergence** runs through 1, 2, 3, 5, 10, 20, 50, 100, 300 and 1000 circles, one cycle
   each.
 - **Number of circles** moves along the scale 1, 2, 3, 4, 5, 6, 8, 10, … 1000 up to N − 1; the box
@@ -66,6 +76,7 @@ npm run bench      # how long the maths takes (spec §6)
 | RMS error | The root mean square distance from the samples to the curve, as a share of the drawing's size |
 | Mean deviation | The mean distance from the samples to the curve, as a share of the drawing's size |
 | Largest circle | Its radius, the way it turns and how many turns it makes per cycle |
+| Pen-up share | For drawings of several strokes: the part of the path that is jumps between strokes, and what it would be in the file's order |
 
 The size of a drawing is the long side of its bounding box. The energy ratio reaches 99.9% with very
 few circles, so the page shows it to the first digit short of 100%; the RMS error says more.
@@ -90,7 +101,7 @@ leaves out.
 |---|---|
 | Coefficients (JSON) | Every c_k (k, re, im), N, M, the order, the source and the k of the circles in use |
 | SVG | The curve for the current number of circles as one path, sized in millimetres for pen plotters and laser cutters |
-| Project | The drawing (generator and seed, or your points), N, M, the order, the speed and the view |
+| Project | The drawing (generator and seed, your points, or an opened file's name and SHA-256, with the file itself if you tick **Include the source file**), N, M, the order, the speed and the view |
 
 Opening a project computes everything again and gives exactly the same result.
 
@@ -124,7 +135,7 @@ Opening a project computes everything again and gives exactly the same result.
 
 ## 繁體中文
 
-line2fourier 把一條封閉的線（隨機產生的線稿，或你自己畫的）寫成單獨一條傅立葉級數。每一項是一個以固定速度轉動的圓，把圓頭尾相接，最後一個圓上的筆尖就把線重新畫出來。拖動滑桿增減圓的數量，就能看到圖形逼近到什麼程度。所有運算都在瀏覽器裡完成，不會上傳任何資料。
+line2fourier 把一張線稿（隨機產生的、你自己畫的、SVG 檔，或 [line2func](https://github.com/far9100/Line-to-function) 從圖片描出的曲線）寫成單獨一條傅立葉級數。每一項是一個以固定速度轉動的圓，把圓頭尾相接，最後一個圓上的筆尖就把線重新畫出來。拖動滑桿增減圓的數量，就能看到圖形逼近到什麼程度。所有運算都在瀏覽器裡完成，不會上傳任何資料。
 
 ```
 R=[0.70052,0.10247,0.09830]
@@ -156,6 +167,9 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 
 - 〔換一張線稿〕隨機產生小怪獸、塗鴉或尖角星形，旁邊的選單可以指定類型。〔更多設定〕裡會顯示種子，也可以輸入種子，畫出同一張線稿。
 - 〔自己畫〕：用滑鼠、手指或觸控筆在畫布上按住拖曳，放開就完成。線會用一段直線自動閉合，以虛線標示。
+- 〔上傳線稿〕可以開啟 SVG 檔或 line2func 的 `curves.json`（也可以直接把檔案拖進頁面或貼上）。所有筆畫會串成一條封閉路徑：筆畫之間的跳線照常參與計算，但不畫出來，順序也會重新安排，讓跳線盡量短。取樣點數與圓的數量會依圖自動選定；指標卡會顯示跳線比例，並與檔案原本的順序比較。
+- 〔頻譜〕以對數刻度畫出 |c_k|，使用中的圓是黃銅色。點選一項（滑鼠或方向鍵），畫布上就會標出它的圓，並顯示 k、|c_k| 與 arg(c_k)。
+- 〔跟隨筆尖〕讓筆尖保持在畫面中央，最多放大 50 倍，連最小的圓都看得到。
 - 〔示範收斂〕依序用 1、2、3、5、10、20、50、100、300、1000 個圓，各畫一輪。
 - 〔圓的數量〕沿著 1、2、3、4、5、6、8、10……1000 一直到 N − 1 的刻度移動；旁邊的輸入框可以填任何整數。
 - 〔依大小〕先用最大的圓：在同樣的圓數下，這是誤差最小的選法。〔依頻率〕先用轉得最慢的圓，相當於低通濾波。
@@ -169,6 +183,7 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 | RMS 誤差 | 取樣點到逼近曲線距離的均方根，以線稿大小的百分比表示 |
 | 平均偏差 | 取樣點到逼近曲線距離的平均，以線稿大小的百分比表示 |
 | 最大的圓 | 半徑、轉向，以及每輪轉幾圈 |
+| 跳線比例 | 多筆畫的線稿中，筆畫之間跳線所占的比例，並與檔案原本的順序比較 |
 
 線稿大小是外框的長邊。能量比例只要很少的圓就超過 99.9%，所以會顯示到第一個不是 9 的位數；RMS 誤差更能看出差別。
 
@@ -186,7 +201,7 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 |---|---|
 | 係數（JSON） | 全部的 c_k（k、re、im）、N、M、排序方式、來源，以及使用中的圓的 k |
 | SVG | 目前圓數的逼近曲線，單一路徑，以公釐為單位，可給筆繪機或雷射切割使用 |
-| 專案 | 線稿（產生器與種子，或你畫的點）、N、M、排序、速度與檢視設定 |
+| 專案 | 線稿（產生器與種子、你畫的點，或開啟的檔案名稱與 SHA-256；勾選〔內嵌原始檔〕時連檔案一起存）、N、M、排序、速度與檢視設定 |
 
 開啟專案時會重新計算，得到完全相同的結果。
 

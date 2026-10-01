@@ -106,7 +106,7 @@ test('reduced motion: starts paused, with the whole approximation shown', async 
 test('order, N and the toggles change what is computed and drawn', async ({ page }) => {
   await open(page, 'gen=star&seed=42&play=0');
   const bySize = await debug(page);
-  await page.getByText('依頻率').click();
+  await page.getByText('依頻率', { exact: true }).click();
   const byFreq = await debug(page);
   expect(byFreq.state.order).toBe('frequency');
   expect(byFreq.used.slice(0, 4)).toEqual([1, -1, 2, -2]);
@@ -114,7 +114,7 @@ test('order, N and the toggles change what is computed and drawn', async ({ page
   await page.locator('summary').click();
   await page.locator('#n-select').selectOption('4096');
   expect((await debug(page)).N).toBe(4096);
-  await page.getByText('顯示圓').click();
+  await page.getByText('顯示圓', { exact: true }).click();
   await page.waitForTimeout(100);
   expect((await debug(page)).frame!.circlesDrawn).toBe(0);
 });

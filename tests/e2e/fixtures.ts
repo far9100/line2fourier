@@ -36,7 +36,12 @@ export const test = base.extend<{ problems: Problems }>({
 export { expect };
 
 export interface Debug {
-  state: { M: number; N: number; playing: boolean; mode: 'play' | 'draw'; lang: string; speed: number; order: string; demo: { step: number; returnM: number } | null; source: { type: string; generator?: string; seed?: number; points?: number } };
+  state: {
+    M: number; N: number; playing: boolean; mode: 'play' | 'draw'; lang: string; speed: number; order: string;
+    demo: { step: number; returnM: number } | null; selectedK: number | null;
+    view: { showCircles: boolean; showOriginal: boolean; follow: boolean; zoom: number };
+    source: { type: string; generator?: string; seed?: number; points?: number; name?: string; strokes?: number };
+  };
   t: number;
   firstCycleDone: boolean;
   M: number;
@@ -47,6 +52,9 @@ export interface Debug {
   used: number[];
   circles: { k: number; r: number; x: number; y: number }[];
   frame: { tip: [number, number]; penUp: boolean; circlesDrawn: number } | null;
+  strokes: number;
+  highlight: { x: number; y: number; r: number; j: number } | null;
+  tipScreen: [number, number] | null;
   calls: Record<string, number>;
   timings: { recompute: number; render: number };
 }

@@ -1,0 +1,14 @@
+{
+ "format": "line2func.curves",
+ "version": 1,
+ "image": {"width": 200, "height": 120},
+ "coordinates": "image-pixels-y-down",
+ "meta": {"engine": "test fixture"},
+ "curves": [
+  {"id": 0, "stroke": 0, "ctrl": [[20, 100], [20, 40], [60, 20], [100, 20]], "confidence": 1.0, "tags": []},
+  {"id": 1, "stroke": 0, "ctrl": [[100, 20], [140, 20], [180, 40], [180, 100]], "confidence": 1.0, "tags": []},
+  {"id": 2, "stroke": 1, "ctrl": [[60, 70], [80, 50], [100, 90], [120, 70]], "confidence": 1.0, "tags": []},
+  {"id": 3, "stroke": 2, "ctrl": [[140, 80], [150, 60], [170, 60], [140, 80]], "confidence": 1.0, "tags": []},
+  {"id": 4, "stroke": 3, "ctrl": [[30, 110], [60, 110], [90, 110], [120, 110]], "confidence": 1.0, "tags": ["fill"]}
+ ]
+}

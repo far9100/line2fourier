@@ -37,7 +37,8 @@ export interface Computed {
 
 export function strokesFor(source: SourceSpec): Stroke[] {
   if (source.type === 'random') return [generate(source.generator, source.seed)];
-  return [{ pts: source.points, closed: false }];
+  if (source.type === 'freehand') return [{ pts: source.points, closed: false }];
+  return source.strokes;
 }
 
 function memo<A extends unknown[], R>(fn: (...args: A) => R, count: () => void): (...args: A) => R {

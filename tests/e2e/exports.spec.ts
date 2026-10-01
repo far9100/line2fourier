@@ -65,7 +65,7 @@ test('a saved project opens again exactly as it was', async ({ page }) => {
   await open(page, 'gen=scribble&seed=12345&play=0');
   await page.locator('#m-number').fill('77');
   await page.locator('#m-number').press('Enter');
-  await page.getByText('依頻率').click();
+  await page.getByText('依頻率', { exact: true }).click();
   const before = await debug(page);
   const text = await downloadOf(page, '#project-save');
   const project = JSON.parse(text);
@@ -82,9 +82,17 @@ test('a saved project opens again exactly as it was', async ({ page }) => {
   expect(after.used).toEqual(before.used);
 });
 
-test('a file that is not a project is refused with a reason', async ({ page }) => {
+test('files that cannot be used are refused with a reason', async ({ page }) => {
   await open(page);
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#project-open').click()]);
-  await chooser.setFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"format":"line2func.curves","version":1}') });
-  await expect(page.locator('#toast')).toHaveText('這不是 line2fourier 的專案檔。');
+  const offer = async (name: string, text: string) => {
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#project-open').click()]);
+    await chooser.setFiles({ name, mimeType: 'application/json', buffer: Buffer.from(text) });
+  };
+  await offer('x.json', '{"format":"something-else","version":1}');
+  await expect(page.locator('#toast')).toHaveText('不支援這種檔案。請開啟 SVG、line2func 的 curves.json 或 line2fourier 專案檔。');
+  await offer('p.json', '{"format":"line2fourier.project","version":2,"source":{}}');
+  await expect(page.locator('#toast')).toHaveText('不支援這個版本的專案檔。');
+  await offer('c.json', '{"format":"line2func.curves","version":1}');
+  await expect(page.locator('#toast')).toHaveText('curves.json 的曲線資料不完整。');
+  expect((await debug(page)).state.source.type).toBe('random');
 });

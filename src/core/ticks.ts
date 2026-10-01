@@ -53,3 +53,12 @@ export function autoN(length: number): NSize {
   for (const N of N_CHOICES) if (N >= 1024 && length / N <= 0.01) return N;
   return 8192;
 }
+
+/**
+ * M for an imported drawing: the smallest tick whose RMS error, sqrt(dropped[M]) from energyTable,
+ * is at most `tol` (default 0.005: a quarter of a percent of the long side, which is 2).
+ */
+export function suggestM(dropped: Float64Array, N: number, tol = 0.005): number {
+  for (const M of mTicks(N)) if (Math.sqrt(dropped[M]) <= tol) return M;
+  return N - 1;
+}

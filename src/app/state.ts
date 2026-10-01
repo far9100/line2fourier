@@ -1,15 +1,31 @@
 // Everything the page can change, in one object (spec §10 is a subset of it).
 import type { Order, Pt } from '../core/fourier.ts';
 import type { GeneratorName } from '../core/generators.ts';
+import type { Stroke } from '../core/path.ts';
 import { DEFAULT_M, DEFAULT_N, N_CHOICES, SPEEDS, clampM, type NSize } from '../core/ticks.ts';
 import type { Lang } from '../i18n/index.ts';
 
 export type { Lang };
 
+export type ImportKind = 'svg' | 'line2func';
+
+/** An imported file, already prepared: its strokes are cleaned, normalized and in tour order. */
+export interface ImportedSource {
+  type: ImportKind;
+  name: string;
+  sha256: string;
+  /** The file's text, kept so a project can embed it. */
+  content: string;
+  strokes: Stroke[];
+  /** Jump length / path length had the strokes been chained in the file's order (spec §4.6). */
+  originalJumpRatio: number;
+}
+
 export type SourceSpec =
   | { type: 'random'; generator: GeneratorName; seed: number }
   /** One stroke in world units (the fixed view scale of render/camera.ts), y up, left open. */
-  | { type: 'freehand'; points: Pt[] };
+  | { type: 'freehand'; points: Pt[] }
+  | ImportedSource;
 
 export interface ViewState {
   showCircles: boolean;
@@ -37,6 +53,8 @@ export interface AppState {
   mode: 'play' | 'draw';
   playing: boolean;
   demo: DemoState | null;
+  /** The k picked in the spectrum panel, highlighted on the canvas (spec §6). */
+  selectedK: number | null;
   lang: Lang;
 }
 
@@ -53,6 +71,7 @@ export function defaultState(source: SourceSpec, lang: Lang, reducedMotion: bool
     mode: 'play',
     playing: !reducedMotion,
     demo: null,
+    selectedK: null,
     lang,
   };
 }

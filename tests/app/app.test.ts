@@ -118,7 +118,9 @@ describe('project file (spec §10)', () => {
     expect(parsed.project).toEqual(toProject(s));
     expect(parsed.warnings).toEqual([]);
     const a = createPipeline().compute(s);
-    const b = createPipeline().compute({ ...s, ...parsed.project });
+    const source = parsed.project.source;
+    if (source.type !== 'random') throw new Error('expected a random source');
+    const b = createPipeline().compute({ ...s, ...parsed.project, source });
     expect(b.spectrum).toEqual(a.spectrum);
     expect(b.approx).toEqual(a.approx);
   });

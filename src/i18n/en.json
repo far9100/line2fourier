@@ -93,5 +93,66 @@
   "about.p4": "The coefficients here are the discrete Fourier transform of N points taken at equal arc length along the line. With all N − 1 circles the curve passes through every one of those points; ordered by size, any number of circles gives the smallest RMS error possible with that many.",
   "about.keysTitle": "Keys",
   "about.keys": "Space: play / pause. ← / →: fewer or more circles (with Shift, one at a time). D: draw your own. Esc: cancel drawing or the demo.",
-  "about.close": "Close"
+  "about.close": "Close",
+  "ctrl.upload": "Open a drawing",
+  "ctrl.uploadTitle": "Open an SVG, a line2func curves.json or a project file (or drop or paste one)",
+  "drop.hint": "Drop to open this file",
+  "import.working": "Reading the file and chaining the strokes…",
+  "import.done": "Imported {name}: {strokes} strokes, N = {N}, M = {M}.",
+  "import.error.svg": "This SVG file could not be read.",
+  "import.error.unknown": "This kind of file is not supported. Open an SVG, a line2func curves.json or a line2fourier project.",
+  "import.error.curves.json": "This curves.json is not valid JSON.",
+  "import.error.curves.format": "This is not a line2func curves.json.",
+  "import.error.curves.version": "This version of curves.json is not supported.",
+  "import.error.curves.coordinates": "This curves.json does not use image-pixels-y-down coordinates.",
+  "import.error.curves.curves": "The curves in this curves.json are incomplete.",
+  "import.droppedStrokes": {
+    "one": "Too many strokes: kept the longest 2000 ({n} left out).",
+    "other": "Too many strokes: kept the longest 2000 ({n} left out)."
+  },
+  "import.simplified": "Too many points: the lines were simplified slightly.",
+  "svg.skippedUse": {
+    "one": "Left out {n} <use> element.",
+    "other": "Left out {n} <use> elements."
+  },
+  "svg.skippedText": {
+    "one": "{n} piece of text was not imported; turn text into outlines first.",
+    "other": "{n} pieces of text were not imported; turn text into outlines first."
+  },
+  "svg.skippedImage": {
+    "one": "Left out {n} embedded image.",
+    "other": "Left out {n} embedded images."
+  },
+  "svg.badTransform": {
+    "one": "{n} element had a transform that could not be read and was left out.",
+    "other": "{n} elements had a transform that could not be read and were left out."
+  },
+  "svg.badPath": {
+    "one": "{n} path has a format error; only the part before it is used.",
+    "other": "{n} paths have format errors; only the parts before them are used."
+  },
+  "svg.nestedViewBox": "The viewBox of a nested <svg> is not applied.",
+  "line2func.skippedFill": {
+    "one": "Left out {n} fill hatching curve.",
+    "other": "Left out {n} fill hatching curves."
+  },
+  "status.import": "{kind}: {name} · {strokes} strokes · M = {M} · N = {N}",
+  "kind.svg": "SVG",
+  "kind.line2func": "line2func",
+  "metrics.jumps": "Pen-up share",
+  "metrics.jumpsValue": "{p} (file order {q})",
+  "view.follow": "Follow the pen",
+  "view.zoom": "Zoom",
+  "spectrum.title": "Spectrum",
+  "spectrum.range": "Range",
+  "spectrum.auto": "Auto",
+  "spectrum.all": "All",
+  "spectrum.label": "|c_k| on a log scale; the bright ones are in use. Arrow keys pick a term.",
+  "spectrum.hint": "Pick a term to mark its circle on the canvas.",
+  "spectrum.readout": "k = {k}   |c_k| = {amp}   arg(c_k) = {arg} rad ({deg}°)",
+  "spectrum.unused": "(not in use)",
+  "project.embed": "Include the source file",
+  "project.needFile": "Choose the original file with Open a drawing: {name}",
+  "project.hashMismatch": "This file differs from the one the project was saved with; the result may differ.",
+  "desmos.jumps": "Desmos also draws the pen-up jumps between strokes."
 }

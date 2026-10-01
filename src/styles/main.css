@@ -152,6 +152,37 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--select); }
 
 .status { margin: 0; color: var(--muted); font-size: 13px; }
 
+.spectrum {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px 8px;
+  background: var(--surface);
+}
+.spectrum-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.spectrum-head h2 { font-size: 14px; color: var(--muted); }
+.spectrum-range { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.spectrum-range select { padding: 3px 6px; }
+#spectrum { display: block; width: 100%; height: 120px; margin-top: 6px; cursor: crosshair; border-radius: 6px; }
+#spectrum-readout { margin-top: 4px; min-height: 1.5em; }
+
+.embed { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.embed[hidden] { display: none; }
+
+#drop-overlay {
+  position: fixed;
+  inset: 12px;
+  border: 2px dashed var(--brass);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+}
+#drop-overlay[hidden] { display: none; }
+#drop-overlay p { font-size: 18px; }
+
 /* Side panel */
 .panel { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .card {
@@ -176,12 +207,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--select); }
 .segmented label:has(input:checked) { border-color: var(--select); }
 .checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .checks label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.field[hidden] { display: none; }
 .advanced summary { cursor: pointer; color: var(--muted); margin-top: 4px; }
 .advanced[open] summary { margin-bottom: 10px; }
 .advanced select { width: 100%; }
 
 .metrics { margin: 0; display: grid; gap: 8px; }
 .metrics div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.metrics div[hidden] { display: none; }
 .metrics dt { color: var(--muted); }
 .metrics dd { margin: 0; text-align: right; }
 .note { margin: 10px 0 0; color: var(--muted); font-size: 13px; }

@@ -38,6 +38,7 @@
           </select>
         </div>
         <button type="button" id="draw" data-i18n="ctrl.draw">Draw your own</button>
+        <button type="button" id="upload" data-i18n="ctrl.upload" data-i18n-title="ctrl.uploadTitle">Open a drawing</button>
         <button type="button" id="demo" aria-pressed="false" data-i18n="ctrl.demo">Show convergence</button>
         <button type="button" id="play" class="play" aria-pressed="false"><span id="play-label" data-i18n="ctrl.play">Play</span></button>
       </div>
@@ -49,6 +50,24 @@
         </div>
       </div>
       <p class="status" id="status"></p>
+      <section class="spectrum" aria-labelledby="spectrum-title">
+        <div class="spectrum-head">
+          <h2 id="spectrum-title" data-i18n="spectrum.title">Spectrum</h2>
+          <label class="spectrum-range"><span data-i18n="spectrum.range">Range</span>
+            <select id="spectrum-range">
+              <option value="auto" data-i18n="spectrum.auto">Auto</option>
+              <option value="32">±32</option>
+              <option value="64">±64</option>
+              <option value="128">±128</option>
+              <option value="256">±256</option>
+              <option value="512">±512</option>
+              <option value="all" data-i18n="spectrum.all">All</option>
+            </select>
+          </label>
+        </div>
+        <canvas id="spectrum" tabindex="0" data-own-keys role="img" aria-label="Spectrum" data-i18n-aria-label="spectrum.label"></canvas>
+        <p class="note" id="spectrum-readout" aria-live="polite"></p>
+      </section>
     </section>
 
     <aside class="panel">
@@ -78,6 +97,14 @@
         <div class="field checks">
           <label><input type="checkbox" id="show-circles"><span data-i18n="view.circles">Show circles</span></label>
           <label><input type="checkbox" id="show-original"><span data-i18n="view.original">Show the original</span></label>
+          <label><input type="checkbox" id="follow"><span data-i18n="view.follow">Follow the pen</span></label>
+        </div>
+        <div class="field" id="zoom-field" hidden>
+          <div class="field-head">
+            <label for="zoom" data-i18n="view.zoom">Zoom</label>
+            <output id="zoom-out" for="zoom"></output>
+          </div>
+          <input type="range" id="zoom" min="0" max="100" step="1">
         </div>
         <details class="advanced">
           <summary data-i18n="advanced">More settings</summary>
@@ -102,6 +129,7 @@
           <div><dt data-i18n="metrics.rms">RMS error</dt><dd id="metric-rms"></dd></div>
           <div><dt data-i18n="metrics.mean">Mean deviation</dt><dd id="metric-mean"></dd></div>
           <div><dt data-i18n="metrics.largest">Largest circle</dt><dd id="metric-largest"></dd></div>
+          <div id="metric-jumps-row" hidden><dt data-i18n="metrics.jumps">Pen-up share</dt><dd id="metric-jumps"></dd></div>
         </dl>
         <p class="note" data-i18n="metrics.note">Errors are shares of the drawing's size. More circles, closer fit.</p>
       </section>
@@ -132,6 +160,7 @@
           <button type="button" id="project-save" data-i18n="project.save">Save project</button>
           <button type="button" id="project-open" data-i18n="project.open">Open project</button>
         </div>
+        <label class="embed" id="embed-row" hidden><input type="checkbox" id="embed-source"><span data-i18n="project.embed">Include the source file</span></label>
       </section>
     </aside>
   </main>
@@ -152,7 +181,8 @@
     <div class="dialog-actions"><button type="button" id="about-close" data-i18n="about.close">Close</button></div>
   </dialog>
 
+  <div id="drop-overlay" hidden><p data-i18n="drop.hint">Drop to open</p></div>
   <div id="toast" role="status" aria-live="polite" hidden></div>
-  <input type="file" id="file-input" accept=".json,application/json" hidden>
+  <input type="file" id="file-input" accept=".svg,.json,image/svg+xml,application/json" hidden>
 </body>
 </html>

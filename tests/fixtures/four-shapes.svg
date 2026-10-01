@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <!-- Four separate shapes, so the pen has to jump between them (spec §12 M2: three or more subpaths). -->
+  <path d="M30 30 h70 v70 h-70 z M300 40 l60 0 l-30 50 z M40 250 l40 -30 l40 30 l40 -30 l40 30" fill="none" stroke="#000"/>
+  <circle cx="330" cy="220" r="40" fill="none" stroke="#000"/>
+</svg>

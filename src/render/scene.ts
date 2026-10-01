@@ -52,6 +52,8 @@ export interface FrameOptions {
   showFull: boolean;
   /** A freehand stroke being drawn, in world units; the epicycles are hidden meanwhile. */
   draft: Pt[] | null;
+  /** The k picked in the spectrum: its circle is marked even when it is smaller than MIN_CIRCLE_PX. */
+  highlightK: number | null;
 }
 
 export interface FrameStats {
@@ -59,6 +61,8 @@ export interface FrameStats {
   penUp: boolean;
   /** Circles actually drawn: the ones at least MIN_CIRCLE_PX across and on screen. */
   circlesDrawn: number;
+  /** The marked circle, in world units, and its place in the chain. */
+  highlight: { x: number; y: number; r: number; j: number } | null;
 }
 
 export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o: FrameOptions): FrameStats {
@@ -84,7 +88,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
   ctx.moveTo(0, -1.25); ctx.lineTo(0, 1.25);
   ctx.stroke();
 
-  const stats: FrameStats = { tip: [0, 0], penUp: false, circlesDrawn: 0 };
+  const stats: FrameStats = { tip: [0, 0], penUp: false, circlesDrawn: 0, highlight: null };
 
   if (scene && o.showOriginal) {
     ctx.globalAlpha = 0.38;
@@ -157,6 +161,23 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
       ctx.beginPath();
       ctx.arc(0, 0, 2 * px, 0, 2 * Math.PI);
       ctx.fill();
+    }
+
+    if (o.highlightK !== null) {
+      let j = -1;
+      for (let i = 0; i < M; i++) if (terms[i].k === o.highlightK) { j = i; break; }
+      if (j >= 0) {
+        const x = joints[2 * j], y = joints[2 * j + 1], r = terms[j].amp;
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = style.select;
+        ctx.lineWidth = 2 * px;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(r, 4 * px), 0, 2 * Math.PI);
+        ctx.moveTo(x, y);
+        ctx.lineTo(joints[2 * j + 2], joints[2 * j + 3]);
+        ctx.stroke();
+        stats.highlight = { x, y, r, j };
+      }
     }
 
     ctx.globalAlpha = 1;

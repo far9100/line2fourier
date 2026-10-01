@@ -11,7 +11,8 @@ export interface KeyActions {
 
 function isEditable(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
-  return el.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+  // data-own-keys: an element that handles its arrows itself (the spectrum panel).
+  return el.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) || el.closest('[data-own-keys]') !== null;
 }
 
 export function bindKeys(actions: KeyActions): void {

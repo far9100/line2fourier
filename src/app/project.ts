@@ -5,16 +5,25 @@
 import type { Order, Pt } from '../core/fourier.ts';
 import { GENERATORS, type GeneratorName } from '../core/generators.ts';
 import { N_CHOICES, SPEEDS, type NSize } from '../core/ticks.ts';
-import { ZOOM_MAX, type AppState, type SourceSpec, type ViewState } from './state.ts';
+import { ZOOM_MAX, type AppState, type ImportKind, type ViewState } from './state.ts';
 
 export const PROJECT_FORMAT = 'line2fourier.project';
 export const ENGINE = 1;
+
+/**
+ * The source as saved: an imported file is kept by name and SHA-256, and its text only when the
+ * user asks to embed it (spec §10); opening the project prepares it again.
+ */
+export type SavedSource =
+  | { type: 'random'; generator: GeneratorName; seed: number }
+  | { type: 'freehand'; points: Pt[] }
+  | { type: ImportKind; name: string; sha256: string; content?: string };
 
 export interface ProjectFile {
   format: typeof PROJECT_FORMAT;
   version: 1;
   engine: number;
-  source: SourceSpec;
+  source: SavedSource;
   N: NSize;
   M: number;
   order: Order;
@@ -22,12 +31,17 @@ export interface ProjectFile {
   view: ViewState;
 }
 
-export function toProject(s: AppState): ProjectFile {
+export function savedSource(s: AppState['source'], embed: boolean): SavedSource {
+  if (s.type === 'random' || s.type === 'freehand') return s;
+  return embed ? { type: s.type, name: s.name, sha256: s.sha256, content: s.content } : { type: s.type, name: s.name, sha256: s.sha256 };
+}
+
+export function toProject(s: AppState, embed = false): ProjectFile {
   return {
     format: PROJECT_FORMAT,
     version: 1,
     engine: ENGINE,
-    source: s.source,
+    source: savedSource(s.source, embed),
     N: s.N,
     M: s.M,
     order: s.order,
@@ -36,8 +50,8 @@ export function toProject(s: AppState): ProjectFile {
   };
 }
 
-export function projectText(s: AppState): string {
-  return `${JSON.stringify(toProject(s), null, 1)}\n`;
+export function projectText(s: AppState, embed = false): string {
+  return `${JSON.stringify(toProject(s, embed), null, 1)}\n`;
 }
 
 export type ProjectError = 'json' | 'format' | 'version' | 'source';
@@ -51,7 +65,7 @@ export interface ParsedProject {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isPt = (v: unknown): v is Pt => Array.isArray(v) && v.length === 2 && v.every(n => typeof n === 'number' && Number.isFinite(n));
 
-function parseSource(v: unknown): SourceSpec | null {
+function parseSource(v: unknown): SavedSource | null {
   if (!isObj(v)) return null;
   if (v.type === 'random') {
     const seed = v.seed;
@@ -62,6 +76,11 @@ function parseSource(v: unknown): SourceSpec | null {
   if (v.type === 'freehand') {
     if (!Array.isArray(v.points) || v.points.length < 2 || !v.points.every(isPt)) return null;
     return { type: 'freehand', points: (v.points as Pt[]).map(([x, y]) => [x, y]) };
+  }
+  if (v.type === 'svg' || v.type === 'line2func') {
+    if (typeof v.name !== 'string' || typeof v.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(v.sha256)) return null;
+    if (v.content !== undefined && typeof v.content !== 'string') return null;
+    return { type: v.type, name: v.name, sha256: v.sha256, ...(typeof v.content === 'string' ? { content: v.content } : {}) };
   }
   return null;
 }
