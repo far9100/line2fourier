@@ -97,6 +97,7 @@
         <div class="field checks">
           <label><input type="checkbox" id="show-circles"><span data-i18n="view.circles">Show circles</span></label>
           <label><input type="checkbox" id="show-original"><span data-i18n="view.original">Show the original</span></label>
+          <label><input type="checkbox" id="show-jumps"><span data-i18n="view.jumps">Show pen-up moves</span><i class="swatch" aria-hidden="true"></i></label>
           <label><input type="checkbox" id="follow"><span data-i18n="view.follow">Follow the pen</span></label>
         </div>
         <div class="field" id="zoom-field" hidden>
@@ -129,7 +130,7 @@
           <div><dt data-i18n="metrics.rms">RMS error</dt><dd id="metric-rms"></dd></div>
           <div><dt data-i18n="metrics.mean">Mean deviation</dt><dd id="metric-mean"></dd></div>
           <div><dt data-i18n="metrics.largest">Largest circle</dt><dd id="metric-largest"></dd></div>
-          <div id="metric-jumps-row" hidden><dt data-i18n="metrics.jumps">Pen-up share</dt><dd id="metric-jumps"></dd></div>
+          <div id="metric-jumps-row" hidden><dt><span data-i18n="metrics.jumps">Pen-up share</span><i class="swatch" aria-hidden="true"></i></dt><dd id="metric-jumps"></dd></div>
         </dl>
         <p class="note" data-i18n="metrics.note">Errors are shares of the drawing's size. More circles, closer fit.</p>
       </section>

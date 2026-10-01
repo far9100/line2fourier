@@ -26,6 +26,7 @@
   "order.frequency": "依頻率",
   "view.circles": "顯示圓",
   "view.original": "顯示原始線稿",
+  "view.jumps": "顯示跳線",
   "advanced": "更多設定",
   "n.label": "取樣點數 N",
   "seed.label": "種子",

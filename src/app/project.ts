@@ -119,6 +119,7 @@ export function parseProject(text: string): ParsedProject | { error: ProjectErro
   const view: ViewState = {
     showCircles: v.showCircles !== false,
     showOriginal: v.showOriginal !== false,
+    showJumps: v.showJumps !== false,
     follow: v.follow === true,
     zoom,
   };

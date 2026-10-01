@@ -7,6 +7,7 @@
   --brass: #B7791F;
   --select: #2A9D8F;
   --warn: #C8423B;
+  --jump: #7B5CC4;
   --surface: #F7F9FB;
   --line: #D3DAE3;
   --muted: #56647C;
@@ -22,6 +23,7 @@
     --brass: #E0A84A;
     --select: #4CC3B4;
     --warn: #E86B63;
+    --jump: #B39DF0;
     --surface: #18202B;
     --line: #2A3442;
     --muted: #97A4B8;
@@ -216,6 +218,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--select); }
 .metrics div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .metrics div[hidden] { display: none; }
 .metrics dt { color: var(--muted); }
+/* A short line in the colour the pen-up moves are drawn in. */
+.swatch { display: inline-block; width: 16px; border-top: 2px solid var(--jump); vertical-align: middle; margin-inline-start: 6px; }
 .metrics dd { margin: 0; text-align: right; }
 .note { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
 

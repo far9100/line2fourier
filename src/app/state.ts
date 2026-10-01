@@ -30,6 +30,8 @@ export type SourceSpec =
 export interface ViewState {
   showCircles: boolean;
   showOriginal: boolean;
+  /** Draw the pen-up moves between strokes, in their own colour (DECISIONS.md D44). */
+  showJumps: boolean;
   /** Keep the pen tip in the middle of the canvas, magnified `zoom` times. */
   follow: boolean;
   zoom: number;
@@ -67,7 +69,7 @@ export function defaultState(source: SourceSpec, lang: Lang, reducedMotion: bool
     M: DEFAULT_M,
     order: 'magnitude',
     speed: 1,
-    view: { showCircles: true, showOriginal: true, follow: false, zoom: 8 },
+    view: { showCircles: true, showOriginal: true, showJumps: true, follow: false, zoom: 8 },
     mode: 'play',
     playing: !reducedMotion,
     demo: null,

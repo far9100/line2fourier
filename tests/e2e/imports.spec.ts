@@ -21,19 +21,25 @@ const evalDebug = <T,>(page: Page, fn: string, arg?: unknown) =>
     return typeof v === 'function' ? (v as (x: unknown) => unknown)(a) : v;
   }, [fn, arg] as const) as Promise<T>;
 
-/** Is there brass (the approximation's colour) within r pixels of the point? */
-async function brassNear(page: Page, p: Point, r = 2): Promise<boolean> {
-  return page.evaluate(([x, y, rad]) => {
+/** Is there a pixel of the given colour within r pixels of the point? */
+async function colourNear(page: Page, colour: 'brass' | 'violet', p: Point, r = 2): Promise<boolean> {
+  return page.evaluate(([x, y, rad, which]) => {
     const c = document.querySelector('#view') as HTMLCanvasElement;
     const ratio = c.width / c.getBoundingClientRect().width;
     const size = 2 * rad + 1;
     const data = c.getContext('2d')!.getImageData(Math.round((x - rad) * ratio), Math.round((y - rad) * ratio), Math.round(size * ratio), Math.round(size * ratio)).data;
-    for (let i = 0; i < data.length; i += 4) if (data[i + 2] - data[i] < -18) return true; // red well above blue
+    for (let i = 0; i < data.length; i += 4) {
+      const [red, green, blue] = [data[i], data[i + 1], data[i + 2]];
+      // brass (the drawing): red well above blue; violet (the jumps), even faint: blue above green,
+      // and red above green too, which the grey-blue of the circles and the grid never has
+      if (which === 'brass' ? blue - red < -18 : blue - green > 20 && red > green) return true;
+    }
     return false;
-  }, [p[0], p[1], r] as const);
+  }, [p[0], p[1], r, colour] as const);
 }
+const brassNear = (page: Page, p: Point, r = 2) => colourNear(page, 'brass', p, r);
 
-test('an SVG with four shapes: chained with jumps that are not drawn, and the share shown', async ({ page }) => {
+test('an SVG with four shapes: chained with jumps, the jumps drawn in their own colour or hidden, the share shown', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); // paused, with the whole approximation drawn
   await open(page);
   await upload(page, 'four-shapes.svg');
@@ -45,7 +51,8 @@ test('an SVG with four shapes: chained with jumps that are not drawn, and the sh
   await expect(page.locator('#metric-jumps')).toContainText('原始順序');
   await expect(page.locator('#status')).toContainText('four-shapes.svg');
 
-  // Circles and the original out of the way: brass along the drawing, none along the jumps.
+  // Circles and the original out of the way: brass along the drawing, never along the jumps,
+  // which are drawn in violet (D44) until they are hidden.
   await page.getByText('顯示圓', { exact: true }).click();
   await page.getByText('顯示原始線稿', { exact: true }).click();
   await page.waitForTimeout(200);
@@ -53,9 +60,17 @@ test('an SVG with four shapes: chained with jumps that are not drawn, and the sh
   const inks = await evalDebug<Point[]>(page, 'mids', 0);
   expect(jumps.length).toBe(4); // three between the shapes and the one back to the start
   for (const p of jumps) expect(await brassNear(page, p), `jump at ${p}`).toBe(false);
+  let violet = 0;
+  for (const p of jumps) if (await colourNear(page, 'violet', p, 4)) violet++;
+  expect(violet).toBeGreaterThanOrEqual(3);
   let drawn = 0;
   for (const p of inks) if (await brassNear(page, p, 3)) drawn++;
   expect(drawn / inks.length).toBeGreaterThan(0.9);
+
+  await page.getByText('顯示跳線', { exact: true }).click();
+  await expect.poll(async () => (await debug(page)).state.view.showJumps).toBe(false);
+  await page.waitForTimeout(200);
+  for (const p of jumps) expect(await colourNear(page, 'violet', p, 4), `jump at ${p}`).toBe(false);
 });
 
 test('line2func curves.json: strokes chained, fill hatching left out and said so', async ({ page }) => {

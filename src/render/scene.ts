@@ -1,6 +1,7 @@
 // One frame on a 2D canvas (spec §6 "主畫布"): the original line (dashed, faint), the full
 // approximation after the first cycle (faint), the trail of this cycle up to the pen, the circles and
-// their links, c_0 as a fixed link from the origin, and the pen. Everything is drawn in world
+// their links, c_0 as a fixed link from the origin, and the pen. The pen-up moves are drawn too, thin
+// and in their own colour, unless they are hidden (DECISIONS.md D44). Everything is drawn in world
 // units under one transform; line widths and dashes are divided by the scale so they stay in pixels,
 // except the pen that paints areas, which is as wide as the drawing says (DECISIONS.md D42).
 import type { Computed } from '../app/pipeline.ts';
@@ -19,28 +20,29 @@ export interface Scene {
   originalInk: Path2D;
   originalClosure: Path2D;
   originalFill: Path2D;
+  originalJump: Path2D;
   fullInk: Path2D;
   fullClosure: Path2D;
   fullFill: Path2D;
+  fullJump: Path2D;
   joints: Float64Array;
 }
 
 export function buildScene(computed: Computed, events: CurveEvents): Scene {
-  const originalInk = new Path2D(), originalClosure = new Path2D(), originalFill = new Path2D();
+  const originalInk = new Path2D(), originalClosure = new Path2D(), originalFill = new Path2D(), originalJump = new Path2D();
   const { poly, kinds } = computed.path;
   const n = poly.length;
   for (let i = 0; i < n; i++) {
     const kind = kinds[i];
-    if (kind === JUMP) continue;
-    const target = kind === CLOSURE ? originalClosure : kind === FILL ? originalFill : originalInk;
+    const target = kind === JUMP ? originalJump : kind === CLOSURE ? originalClosure : kind === FILL ? originalFill : originalInk;
     const a = poly[i], b = poly[(i + 1) % n];
     if (i === 0 || kinds[i - 1] !== kind) target.moveTo(a[0], a[1]);
     target.lineTo(b[0], b[1]);
   }
-  const fullInk = new Path2D(), fullClosure = new Path2D(), fullFill = new Path2D();
-  traceCurve(events, 1, null, fullInk, fullClosure, fullFill);
+  const fullInk = new Path2D(), fullClosure = new Path2D(), fullFill = new Path2D(), fullJump = new Path2D();
+  traceCurve(events, 1, null, fullInk, fullClosure, fullFill, fullJump);
   return {
-    computed, events, originalInk, originalClosure, originalFill, fullInk, fullClosure, fullFill,
+    computed, events, originalInk, originalClosure, originalFill, originalJump, fullInk, fullClosure, fullFill, fullJump,
     joints: new Float64Array(2 * computed.M + 2),
   };
 }
@@ -54,6 +56,8 @@ export interface FrameOptions {
   style: Style;
   showCircles: boolean;
   showOriginal: boolean;
+  /** The pen-up moves, in their own colour. */
+  showJumps: boolean;
   /** The faint full approximation (after the first cycle, or when paused for reduced motion). */
   showFull: boolean;
   /** A freehand stroke being drawn, in world units; the epicycles are hidden meanwhile. */
@@ -106,6 +110,13 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
       ctx.lineWidth = fillWidth;
       ctx.stroke(scene.originalFill);
     }
+    if (o.showJumps) {
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = style.jump;
+      ctx.lineWidth = px;
+      ctx.setLineDash([1.5 * px, 3.5 * px]);
+      ctx.stroke(scene.originalJump);
+    }
     ctx.globalAlpha = 0.38;
     ctx.strokeStyle = style.ink;
     ctx.lineWidth = 1.25 * px;
@@ -126,6 +137,12 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
     stats.tip = tip;
     stats.penUp = kindAt(c.spans, o.t) === JUMP;
 
+    if (o.showFull && o.showJumps) {
+      ctx.globalAlpha = 0.45; // thinner than the faint drawing, so a little stronger
+      ctx.strokeStyle = style.jump;
+      ctx.lineWidth = px;
+      ctx.stroke(scene.fullJump);
+    }
     ctx.strokeStyle = style.brass;
     if (o.showFull) {
       ctx.globalAlpha = 0.3;
@@ -140,8 +157,15 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
       ctx.setLineDash([]);
     }
 
-    const trailInk = new Path2D(), trailClosure = new Path2D(), trailFill = new Path2D();
-    traceCurve(scene.events, o.t, tip, trailInk, trailClosure, trailFill);
+    const trailInk = new Path2D(), trailClosure = new Path2D(), trailFill = new Path2D(), trailJump = new Path2D();
+    traceCurve(scene.events, o.t, tip, trailInk, trailClosure, trailFill, o.showJumps ? trailJump : null);
+    if (o.showJumps) {
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = style.jump;
+      ctx.lineWidth = 1.25 * px;
+      ctx.stroke(trailJump);
+      ctx.strokeStyle = style.brass;
+    }
     ctx.globalAlpha = 1;
     if (scene.events.fillWidth > 0) {
       ctx.lineWidth = fillWidth;
@@ -207,7 +231,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene | null, o:
     ctx.beginPath();
     ctx.arc(tip[0], tip[1], 3.5 * px, 0, 2 * Math.PI);
     if (stats.penUp) {
-      ctx.strokeStyle = style.brass;
+      ctx.strokeStyle = o.showJumps ? style.jump : style.brass;
       ctx.lineWidth = 1.5 * px;
       ctx.stroke();
     } else {

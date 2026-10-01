@@ -137,7 +137,8 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
       const result = await exportVideo(
         (ctx, time) => drawFrame(ctx, scene, {
           t: time, width: VIDEO_SIZE, height: VIDEO_SIZE, dpr: 1, camera, style,
-          showCircles: s.view.showCircles, showOriginal: s.view.showOriginal, showFull: false, draft: null, highlightK: null,
+          showCircles: s.view.showCircles, showOriginal: s.view.showOriginal, showJumps: s.view.showJumps,
+          showFull: false, draft: null, highlightK: null,
         }),
         { width: VIDEO_SIZE, height: VIDEO_SIZE, fps: VIDEO_FPS, seconds: CYCLE_SECONDS / s.speed },
         done => { progress.textContent = t('video.progress', { p: String(Math.round(100 * done)) }); },

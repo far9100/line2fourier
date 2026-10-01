@@ -74,14 +74,16 @@ export function curveEvents(approx: Pt[], spans: Spans, at: (t: number) => Pt, f
 
 /**
  * Draw the curve from t = 0 up to tEnd (all of it when tEnd ≥ 1) into `ink`, `closure` and `fill`
- * (the stretches that paint an area, drawn with the wide pen), leaving the jumps out; when the
- * curve is cut short it ends at `tip`.
+ * (the stretches that paint an area, drawn with the wide pen), and the jumps into `jump`, or
+ * nowhere when it is null; when the curve is cut short it ends at `tip`.
  */
-export function traceCurve(ev: CurveEvents, tEnd: number, tip: Pt | null, ink: PathSink, closure: PathSink, fill: PathSink = ink): void {
+export function traceCurve(
+  ev: CurveEvents, tEnd: number, tip: Pt | null, ink: PathSink, closure: PathSink, fill: PathSink = ink, jump: PathSink | null = null,
+): void {
   let pen: PathSink | null = null;
   for (let i = 0; i + 1 < ev.count && ev.t[i] < tEnd; i++) {
     const k = ev.kind[i];
-    const sink = k === JUMP ? null : k === CLOSURE ? closure : k === FILL ? fill : ink;
+    const sink = k === JUMP ? jump : k === CLOSURE ? closure : k === FILL ? fill : ink;
     if (!sink) { pen = null; continue; }
     if (pen !== sink) { sink.moveTo(ev.x[i], ev.y[i]); pen = sink; }
     if (ev.t[i + 1] <= tEnd || !tip) {

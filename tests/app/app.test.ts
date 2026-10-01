@@ -125,6 +125,15 @@ describe('project file (spec §10)', () => {
     expect(b.approx).toEqual(a.approx);
   });
 
+  it('shows the pen-up moves unless the file says not to (D44)', () => {
+    const shown = parseProject(projectText(base()));
+    expect('project' in shown && shown.project.view.showJumps).toBe(true);
+    const hidden = parseProject(projectText({ ...base(), view: { ...base().view, showJumps: false } }));
+    expect('project' in hidden && hidden.project.view.showJumps).toBe(false);
+    const old = parseProject(JSON.stringify({ version: 1, source: { type: 'random', generator: 'star', seed: 1 }, view: { showCircles: false } }));
+    expect('project' in old && old.project.view).toMatchObject({ showCircles: false, showJumps: true });
+  });
+
   it('accepts the spec’s example, which has no format field', () => {
     const parsed = parseProject(JSON.stringify({
       version: 1,

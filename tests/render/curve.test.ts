@@ -91,6 +91,15 @@ describe('tracing the curve', () => {
     for (const [x] of fill.lines[0]) expect(x).toBeGreaterThan(2.5);
   });
 
+  it('with a sink for them, the jumps are traced too, each joining the end of one stroke to the start of the next (D44)', () => {
+    const ink = recorder(), closure = recorder(), jump = recorder();
+    traceCurve(ev, 1, null, ink.sink, closure.sink, ink.sink, jump.sink);
+    expect(ink.lines).toHaveLength(2);
+    expect(jump.lines).toHaveLength(2); // between the strokes, and back to the start
+    expect(jump.lines[0][0]).toEqual(ink.lines[0][ink.lines[0].length - 1]);
+    expect(jump.lines[0][jump.lines[0].length - 1]).toEqual(ink.lines[1][0]);
+  });
+
   it('a trail stops at the pen, wherever it is', () => {
     const t = 0.123, tip = tipAt(o.c0, o.terms, M, t);
     const ink = recorder(), closure = recorder();

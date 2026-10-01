@@ -153,6 +153,7 @@ function draw(): void {
     camera: follow ? view.camera(follow, s.view.zoom) : view.baseCamera(),
     showCircles: s.view.showCircles,
     showOriginal: s.view.showOriginal || drawing,
+    showJumps: s.view.showJumps,
     showFull: !s.demo && firstCycleDone,
     draft: drawing ? draft ?? [] : null,
     highlightK: s.selectedK,
@@ -224,6 +225,9 @@ $<HTMLInputElement>('#show-circles').addEventListener('change', e => {
 });
 $<HTMLInputElement>('#show-original').addEventListener('change', e => {
   store.set({ view: { ...store.get().view, showOriginal: (e.target as HTMLInputElement).checked } });
+});
+$<HTMLInputElement>('#show-jumps').addEventListener('change', e => {
+  store.set({ view: { ...store.get().view, showJumps: (e.target as HTMLInputElement).checked } });
 });
 nSelect.addEventListener('change', () => store.set({ N: Number(nSelect.value) as NSize }));
 
@@ -541,6 +545,7 @@ function showControls(s: AppState): void {
   for (const r of document.querySelectorAll<HTMLInputElement>('input[name="order"]')) r.checked = r.value === s.order;
   $<HTMLInputElement>('#show-circles').checked = s.view.showCircles;
   $<HTMLInputElement>('#show-original').checked = s.view.showOriginal;
+  $<HTMLInputElement>('#show-jumps').checked = s.view.showJumps;
   $<HTMLInputElement>('#follow').checked = s.view.follow;
   $('#zoom-field').hidden = !s.view.follow;
   zoomRange.value = String(Math.round((100 * Math.log(s.view.zoom)) / Math.log(50)));

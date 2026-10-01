@@ -39,7 +39,7 @@ export interface Debug {
   state: {
     M: number; N: number; playing: boolean; mode: 'play' | 'draw'; lang: string; speed: number; order: string;
     demo: { step: number; returnM: number } | null; selectedK: number | null;
-    view: { showCircles: boolean; showOriginal: boolean; follow: boolean; zoom: number };
+    view: { showCircles: boolean; showOriginal: boolean; showJumps: boolean; follow: boolean; zoom: number };
     source: { type: string; generator?: string; seed?: number; points?: number; name?: string; strokes?: number };
   };
   t: number;

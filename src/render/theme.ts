@@ -8,6 +8,8 @@ export interface Style {
   brass: string;
   select: string;
   warn: string;
+  /** The pen-up moves between strokes. */
+  jump: string;
 }
 
 export function readStyle(el: Element = document.documentElement): Style {
@@ -20,5 +22,6 @@ export function readStyle(el: Element = document.documentElement): Style {
     brass: v('--brass', '#B7791F'),
     select: v('--select', '#2A9D8F'),
     warn: v('--warn', '#C8423B'),
+    jump: v('--jump', '#7B5CC4'),
   };
 }
