@@ -1,11 +1,13 @@
 // Opening a drawing from a file (spec §5.3–§5.5): read it into strokes, clean and simplify them
-// (§13), normalize to [-1, 1]² (§3), order them in the worker (§4.6), and pick N for its length.
+// (§13), normalize to [-1, 1]² (§3), join ends that nearly meet (D38), order them in the worker
+// (§4.6), and pick N for its length.
+import { BRIDGE_SHARE, bridgeEnds } from '../core/bridge.ts';
 import { curvesToStrokes, parseCurvesJson } from '../core/line2funcImport.ts';
 import { JUMP, PathError, buildPath, normalizeToUnit, prepareStrokes, strokesBBox, type Stroke } from '../core/path.ts';
 import { simplifyDrawing } from '../core/simplify.ts';
 import { readSvg, svgItemsToStrokes, type ImportWarnings } from '../core/svgImport.ts';
 import { autoN, type NSize } from '../core/ticks.ts';
-import { applyTour, type Tour } from '../core/tour.ts';
+import { applyTour, jumpLengthOf, originalOrder, type Tour } from '../core/tour.ts';
 import type { Pt } from '../core/fourier.ts';
 
 export type FileKind = 'svg' | 'line2func' | 'image' | 'project';
@@ -29,9 +31,12 @@ export function detectKind(name: string, text: string, mime = ''): FileKind | nu
 }
 
 export interface Prepared {
-  /** Normalized, cleaned and walked in tour order (see applyTour). */
+  /** Normalized, cleaned, joined where ends nearly meet, and walked in tour order (see applyTour). */
   strokes: Stroke[];
+  /** Strokes in the file (after cleaning), before any were joined. */
   strokeCount: number;
+  /** Pen-down strokes after joining: the pen lifts once per stroke. */
+  penDownStrokes: number;
   jumpRatio: number;
   originalJumpRatio: number;
   N: NSize;
@@ -55,20 +60,36 @@ export async function finishImport(raw: Stroke[], warnings: ImportWarnings, tour
   if (simple.droppedStrokes > 0) warnings['import.droppedStrokes'] = simple.droppedStrokes;
   if (simple.epsilon > 0) warnings['import.simplified'] = 1;
   strokes = normalizeToUnit(prepareStrokes(simple.strokes));
+  const strokeCount = strokes.length;
+  // The baseline shown next to the result: the file's strokes as they are, in the file's order.
+  const fileJump = jumpLengthOf(strokes, originalOrder(strokes));
+  const fileInk = strokes.reduce((s, st) => s + strokeLength(st), 0);
+
+  // Gaps narrower than 0.5% of the drawing are crossed pen-down (the long side is 2 after normalizing).
+  const bridged = bridgeEnds(strokes, BRIDGE_SHARE * 2);
+  if (bridged.bridges > 0) warnings['import.bridged'] = bridged.bridges;
+  strokes = prepareStrokes(bridged.strokes);
 
   const t = await tour(strokes);
   const walked = applyTour(strokes, t.steps);
   const path = buildPath(prepareStrokes(walked));
-  const drawn = path.total - path.lengths[JUMP];
   return {
     strokes: walked,
-    strokeCount: strokes.length,
+    strokeCount,
+    penDownStrokes: strokes.length,
     jumpRatio: path.lengths[JUMP] / path.total,
-    originalJumpRatio: t.originalJumpLength / (drawn + t.originalJumpLength),
+    originalJumpRatio: fileJump / (fileInk + fileJump),
     N: autoN(path.total),
     warnings,
   };
 }
+
+const strokeLength = (s: Stroke) => {
+  const pts = s.closed ? [...s.pts, s.pts[0]] : s.pts;
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  return len;
+};
 
 /** An SVG file or line2func's curves.json. */
 export async function prepareImport(kind: 'svg' | 'line2func', text: string, tour: TourFn): Promise<Prepared | { error: string }> {

@@ -362,7 +362,7 @@ fileInput.addEventListener('change', () => {
 type Settings = Pick<ProjectFile, 'N' | 'M' | 'order' | 'speed' | 'view'>;
 
 /** A project whose imported drawing was not embedded: the next such file opened is taken as that drawing. */
-let relink: { kind: ImportKind; sha256: string; settings: Settings } | null = null;
+let relink: { kind: ImportKind; sha256: string; settings: Settings; notes: string[] } | null = null;
 
 async function openFile(file: File): Promise<void> {
   if (detectKind(file.name, '', file.type) === 'image') {
@@ -375,25 +375,30 @@ async function openFile(file: File): Promise<void> {
     relink = null;
     await openProject(text);
   } else if (kind === 'svg' || kind === 'line2func') {
-    const settings = await takeRelink(kind, text);
-    await importDrawing({ kind, name: file.name, sha256: await sha256Hex(text), content: text }, () => prepareImport(kind, text, s => worker.tour(s)), settings);
+    const project = await takeRelink(kind, text);
+    await importDrawing({ kind, name: file.name, sha256: await sha256Hex(text), content: text }, () => prepareImport(kind, text, s => worker.tour(s)), project?.settings, project?.notes);
   } else {
     toast(t('import.error.unknown'), 'error');
   }
 }
 
-/** The settings of a project waiting for this file, if it is the kind it waits for (the hash is checked, not required). */
-async function takeRelink(kind: ImportKind, data: string | Uint8Array): Promise<Settings | undefined> {
+/** A project waiting for this file, if it is the kind it waits for (the hash is checked, not required). */
+async function takeRelink(kind: ImportKind, data: string | Uint8Array): Promise<{ settings: Settings; notes: string[] } | undefined> {
   const pending = relink;
   relink = null;
   if (!pending || pending.kind !== kind) return undefined;
-  if ((await sha256Hex(data)) !== pending.sha256) toast(t('project.hashMismatch'), 'error');
-  return pending.settings;
+  const notes = [...pending.notes];
+  if ((await sha256Hex(data)) !== pending.sha256) notes.push(t('project.hashMismatch'));
+  return { settings: pending.settings, notes };
 }
 
 /** Spec §5.5: the browser decodes the image; thinning and tracing run in the worker. */
-async function openImage(name: string, bytes: Uint8Array, mime: string, settings?: Settings): Promise<void> {
-  settings ??= await takeRelink('image', bytes);
+async function openImage(name: string, bytes: Uint8Array, mime: string, settings?: Settings, notes: string[] = []): Promise<void> {
+  if (!settings) {
+    const project = await takeRelink('image', bytes);
+    settings = project?.settings;
+    notes = project?.notes ?? notes;
+  }
   const sha256 = await sha256Hex(bytes);
   await importDrawing({ kind: 'image', name, sha256, content: bytesToDataUrl(bytes, mime) }, async () => {
     let img;
@@ -404,14 +409,14 @@ async function openImage(name: string, bytes: Uint8Array, mime: string, settings
     }
     const traced = await worker.raster(img.data, img.width, img.height);
     return finishImport(imageStrokes(traced.strokes, traced.h), { ...traced.warnings }, s => worker.tour(s));
-  }, settings);
+  }, settings, notes);
 }
 
 let importing = 0;
 
 interface Incoming { kind: ImportKind; name: string; sha256: string; content: string }
 
-async function importDrawing(file: Incoming, prepare: () => Promise<Prepared | { error: string }>, settings?: Settings): Promise<void> {
+async function importDrawing(file: Incoming, prepare: () => Promise<Prepared | { error: string }>, settings?: Settings, projectNotes: string[] = []): Promise<void> {
   const ticket = ++importing;
   toast(t('import.working'), '', true);
   const prepared = await prepare();
@@ -435,7 +440,7 @@ async function importDrawing(file: Incoming, prepare: () => Promise<Prepared | {
   }
   const s = store.get();
   const notes = Object.entries(prepared.warnings).map(([key, n]) => t(key, { n }));
-  toast([t('import.done', { name: file.name, strokes: prepared.strokeCount, N: String(s.N), M: String(s.M) }), ...notes].join(' '), '');
+  toast([t('import.done', { name: file.name, strokes: prepared.strokeCount, N: String(s.N), M: String(s.M) }), ...notes, ...projectNotes].join(' '), '');
 }
 
 async function openProject(text: string): Promise<void> {
@@ -453,8 +458,9 @@ async function openProject(text: string): Promise<void> {
     toast([t('project.loaded'), ...parsed.warnings.map(w => t(w))].join(' '), '');
     return;
   }
+  const notes = parsed.warnings.map(w => t(w));
   if (src.content === undefined) {
-    relink = { kind: src.type, sha256: src.sha256, settings };
+    relink = { kind: src.type, sha256: src.sha256, settings, notes };
     toast(t('project.needFile', { name: src.name }), '', true);
     return;
   }
@@ -464,13 +470,13 @@ async function openProject(text: string): Promise<void> {
       toast(t('project.error.source'), 'error');
       return;
     }
-    if ((await sha256Hex(decoded.bytes)) !== src.sha256) toast(t('project.hashMismatch'), 'error');
-    await openImage(src.name, decoded.bytes, decoded.mime, settings);
+    if ((await sha256Hex(decoded.bytes)) !== src.sha256) notes.push(t('project.hashMismatch'));
+    await openImage(src.name, decoded.bytes, decoded.mime, settings, notes);
     return;
   }
   const kind = src.type, content = src.content;
-  if ((await sha256Hex(content)) !== src.sha256) toast(t('project.hashMismatch'), 'error');
-  await importDrawing({ kind, name: src.name, sha256: src.sha256, content }, () => prepareImport(kind, content, s => worker.tour(s)), settings);
+  if ((await sha256Hex(content)) !== src.sha256) notes.push(t('project.hashMismatch'));
+  await importDrawing({ kind, name: src.name, sha256: src.sha256, content }, () => prepareImport(kind, content, s => worker.tour(s)), settings, notes);
 }
 
 // Files dropped anywhere on the page, or pasted (after line2func's viewer/app.js).
@@ -570,7 +576,7 @@ function showMetrics(): void {
   // Spec §4.6: the share of the path that is pen-up jumps, against the file's own order.
   const src = store.get().source;
   $('#metric-jumps-row').hidden = c.jumpRatio === 0;
-  $('#metric-jumps').textContent = src.type === 'svg' || src.type === 'line2func'
+  $('#metric-jumps').textContent = src.type !== 'random' && src.type !== 'freehand'
     ? t('metrics.jumpsValue', { p: formatShare(c.jumpRatio, 1), q: formatShare(src.originalJumpRatio, 1) })
     : formatShare(c.jumpRatio, 1);
 }

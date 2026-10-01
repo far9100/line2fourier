@@ -8,7 +8,8 @@ import { N_CHOICES, SPEEDS, type NSize } from '../core/ticks.ts';
 import { ZOOM_MAX, type AppState, type ImportKind, type ViewState } from './state.ts';
 
 export const PROJECT_FORMAT = 'line2fourier.project';
-export const ENGINE = 1;
+/** 2: imports join near ends (D38); images outline solid areas and walk Euler trails (D39, D40). */
+export const ENGINE = 2;
 
 /**
  * The source as saved: an imported file is kept by name and SHA-256, and its text only when the
@@ -102,6 +103,8 @@ export function parseProject(text: string): ParsedProject | { error: ProjectErro
   const warnings: string[] = [];
   const engine = typeof data.engine === 'number' ? data.engine : ENGINE;
   if (engine > ENGINE) warnings.push('project.newerEngine');
+  // Random and hand-drawn sources come out the same in every engine so far; imports do not.
+  if (engine < ENGINE && source.type !== 'random' && source.type !== 'freehand') warnings.push('project.olderEngine');
   const N = (N_CHOICES as readonly unknown[]).includes(data.N) ? (data.N as NSize) : 1024;
   if (N !== data.N) warnings.push('project.fixedValues');
   const M = typeof data.M === 'number' && Number.isFinite(data.M) ? Math.min(N - 1, Math.max(1, Math.round(data.M))) : 50;

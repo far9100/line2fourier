@@ -52,8 +52,10 @@ npm run bench      # how long the maths takes (spec §6)
   line is closed with a straight segment, shown dashed.
 - **Open a drawing** takes an SVG file, line2func's `curves.json` or a picture of line art (PNG,
   JPEG, …; you can also drop a file on the page or paste one). A picture is thinned to
-  one-pixel lines and traced; for photos, trace them with line2func first and open its
-  `curves.json`. Every stroke is chained into one closed path; the pen-up jumps between
+  one-pixel lines and traced, with areas of solid ink drawn by their outline; for photos and
+  pencil sketches, trace them with line2func first and open its `curves.json`. Stroke ends that
+  almost meet (within half a percent of the drawing) are joined pen-down, and lines go on through
+  junctions, so the pen lifts only where the drawing makes it. Every stroke is chained into one closed path; the pen-up jumps between
   strokes are computed with the rest but never drawn, and their order is chosen to keep them short.
   The number of samples and of circles is picked for the drawing; the card shows the pen-up share
   against the file's own order.
@@ -177,7 +179,7 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 
 - 〔換一張線稿〕隨機產生小怪獸、塗鴉或尖角星形，旁邊的選單可以指定類型。〔更多設定〕裡會顯示種子，也可以輸入種子，畫出同一張線稿。
 - 〔自己畫〕：用滑鼠、手指或觸控筆在畫布上按住拖曳，放開就完成。線會用一段直線自動閉合，以虛線標示。
-- 〔上傳線稿〕可以開啟 SVG 檔、line2func 的 `curves.json` 或線稿圖片（PNG、JPEG 等；也可以直接把檔案拖進頁面或貼上）。圖片會先細線化成一像素寬，再追蹤成線條；照片請先用 line2func 描線，再開啟它的 `curves.json`。所有筆畫會串成一條封閉路徑：筆畫之間的跳線照常參與計算，但不畫出來，順序也會重新安排，讓跳線盡量短。取樣點數與圓的數量會依圖自動選定；指標卡會顯示跳線比例，並與檔案原本的順序比較。
+- 〔上傳線稿〕可以開啟 SVG 檔、line2func 的 `curves.json` 或線稿圖片（PNG、JPEG 等；也可以直接把檔案拖進頁面或貼上）。圖片會先細線化成一像素寬，再追蹤成線條，塗黑的區域則描外框；照片和鉛筆稿請先用 line2func 描線，再開啟它的 `curves.json`。端點幾乎相接（距離不到圖大小的 0.5%）的筆畫會直接畫線連起來，線也會穿過分岔點繼續畫，只在線稿本身逼不得已的地方抬筆。所有筆畫會串成一條封閉路徑：筆畫之間的跳線照常參與計算，但不畫出來，順序也會重新安排，讓跳線盡量短。取樣點數與圓的數量會依圖自動選定；指標卡會顯示跳線比例，並與檔案原本的順序比較。
 - 〔頻譜〕以對數刻度畫出 |c_k|，使用中的圓是黃銅色。點選一項（滑鼠或方向鍵），畫布上就會標出它的圓，並顯示 k、|c_k| 與 arg(c_k)。
 - 〔跟隨筆尖〕讓筆尖保持在畫面中央，最多放大 50 倍，連最小的圓都看得到。
 - 〔示範收斂〕依序用 1、2、3、5、10、20、50、100、300、1000 個圓，各畫一輪。

@@ -107,6 +107,7 @@ test('a line-art image is traced into strokes', async ({ page }) => {
   await expect(page.locator('#toast')).toContainText('已匯入 ring-and-cross.png', { timeout: 20_000 });
   const d = await debug(page);
   expect(d.state.source).toMatchObject({ type: 'image', name: 'ring-and-cross.png' });
-  expect(d.strokes).toBe(5); // the ring, and the cross's four arms
+  expect(d.strokes).toBe(3); // the ring, and the cross as two lines through its middle (D39)
   expect(d.jumpRatio).toBeGreaterThan(0);
+  await expect(page.locator('#metric-jumps')).toContainText('原始順序');
 });

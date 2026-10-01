@@ -180,5 +180,14 @@
   "import.error.image": "This image could not be read.",
   "raster.inverted": "The image has light lines on a dark ground; it was inverted.",
   "raster.photo": "This looks like a photo rather than line art. Trace it with line2func first and open its curves.json.",
-  "kind.image": "Image"
+  "kind.image": "Image",
+  "import.bridged": {
+    "one": "Joined {n} small gap, so the pen lifts less often.",
+    "other": "Joined {n} small gaps, so the pen lifts less often."
+  },
+  "raster.outlined": {
+    "one": "{n} solid area is drawn by its outline.",
+    "other": "{n} solid areas are drawn by their outlines."
+  },
+  "project.olderEngine": "This project was made by an earlier version; this version traces its imported drawing a little differently."
 }

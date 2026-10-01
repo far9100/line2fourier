@@ -29,12 +29,23 @@ describe('opening files', () => {
     const p = await prepareImport('svg', svg, tour);
     if ('error' in p) throw new Error(p.error);
     expect(p.strokeCount).toBe(4);
+    expect(p.penDownStrokes).toBe(4); // the shapes are far apart: nothing to join
     expect(p.jumpRatio).toBeGreaterThan(0);
     expect(p.jumpRatio).toBeLessThanOrEqual(p.originalJumpRatio);
     const b = strokesBBox(p.strokes);
     expect(Math.max(b.maxX - b.minX, b.maxY - b.minY)).toBeCloseTo(2, 9);
     expect([1024, 2048, 4096, 8192]).toContain(p.N);
     expect(p.warnings).toEqual({});
+  });
+
+  it('strokes whose ends nearly meet are joined into one pen-down stroke (D38)', async () => {
+    const twoLines = `<svg xmlns="http://www.w3.org/2000/svg"><path d="M10 10 L60 10 M60.2 10 L100 50"/></svg>`;
+    const p = await prepareImport('svg', twoLines, tour);
+    if ('error' in p) throw new Error(p.error);
+    expect(p.strokeCount).toBe(2);
+    expect(p.penDownStrokes).toBe(1);
+    expect(p.warnings).toEqual({ 'import.bridged': 1 });
+    expect(p.jumpRatio).toBeLessThan(p.originalJumpRatio);
   });
 
   it('says why a file cannot be used', async () => {

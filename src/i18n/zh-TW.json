@@ -141,5 +141,8 @@
   "import.error.image": "無法讀取這張圖片。",
   "raster.inverted": "圖片是深底淺線，已自動反相。",
   "raster.photo": "這張圖看起來像照片，不是線稿。建議先用 line2func 描成線稿，再匯入它的 curves.json。",
-  "kind.image": "圖片"
+  "kind.image": "圖片",
+  "import.bridged": "接上 {n} 個小斷口，少抬幾次筆。",
+  "raster.outlined": "{n} 塊塗黑的區域改描外框。",
+  "project.olderEngine": "這個專案由舊版建立，匯入的線稿這一版會處理得略有不同。"
 }
