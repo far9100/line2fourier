@@ -39,18 +39,7 @@
   "seed.apply": "Draw it",
   "seed.invalid": "A seed is a whole number from 0 to 4294967295.",
   "metrics.title": "How close",
-  "metrics.energy": "Energy captured",
   "metrics.rms": "RMS error",
-  "metrics.mean": "Mean deviation",
-  "metrics.largest": "Largest circle",
-  "metrics.largestCcw": {
-    "one": "radius {r}, counter-clockwise, {n} turn per cycle",
-    "other": "radius {r}, counter-clockwise, {n} turns per cycle"
-  },
-  "metrics.largestCw": {
-    "one": "radius {r}, clockwise, {n} turn per cycle",
-    "other": "radius {r}, clockwise, {n} turns per cycle"
-  },
   "metrics.note": "Errors are shares of the drawing's size (the long side of its box). More circles, closer fit.",
   "formula.title": "The series",
   "formula.count": {
@@ -64,7 +53,7 @@
   "toast.copied": "Copied; ready to paste.",
   "toast.copiedSlider": "Copied. In Desmos, click the numbers at the slider's ends and set it to run from 1 to {n} in steps of 1.",
   "toast.copyFailed": "Could not reach the clipboard. Open this page over HTTPS or from localhost and try again.",
-  "export.title": "Export and save",
+  "export.title": "Formula and files",
   "export.json": "Coefficients (JSON)",
   "export.svgWidth": "Width (mm)",
   "export.svgStroke": "Line (mm)",
@@ -93,7 +82,7 @@
   "about.p3": "How fast depends on how smooth the curve is: on a curve that is smooth everywhere the coefficients fall off quickly; with sharp corners |c_k| falls off only like 1/k², so with too few circles the corners get rounded and straight edges ripple.",
   "about.p4": "The coefficients here are the discrete Fourier transform of N points taken at equal arc length along the line. With all N − 1 circles the curve passes through every one of those points; ordered by size, any number of circles gives the smallest RMS error possible with that many.",
   "about.keysTitle": "Keys",
-  "about.keys": "Space: play / pause. ← / →: fewer or more circles (with Shift, one at a time). D: draw your own. Esc: cancel drawing or the demo.",
+  "about.keys": "Space: play / pause. ← / →: fewer or more circles (with Shift, one at a time). + / −: zoom in / out. 0: the whole drawing. F: full screen. D: draw your own. Esc: cancel drawing or the demo. On the drawing, the wheel zooms, dragging moves the view and a double-click shows all of it.",
   "about.close": "Close",
   "ctrl.upload": "Open a drawing",
   "ctrl.uploadTitle": "Open an SVG, a line2func curves.json or a project file (or drop or paste one)",
@@ -143,7 +132,6 @@
   "metrics.jumps": "Pen-up share",
   "metrics.jumpsValue": "{p} (file order {q})",
   "view.follow": "Follow the pen",
-  "view.zoom": "Zoom",
   "spectrum.title": "Spectrum",
   "spectrum.range": "Range",
   "spectrum.auto": "Auto",
@@ -190,5 +178,13 @@
   "import.filled": {
     "one": "{n} solid area is painted in, as in the picture.",
     "other": "{n} solid areas are painted in, as in the picture."
-  }
+  },
+  "export.files": "Files",
+  "panel.display": "Show",
+  "view.tools": "View",
+  "view.zoomIn": "Zoom in (+)",
+  "view.zoomOut": "Zoom out (−)",
+  "view.fit": "Whole drawing (0, or double-click)",
+  "view.fullscreen": "Full screen (F)",
+  "view.exitFullscreen": "Leave full screen (F or Esc)"
 }

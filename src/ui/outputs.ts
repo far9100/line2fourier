@@ -9,7 +9,7 @@ import { downloadBlob } from '../export/download.ts';
 import { exportFlipbook, flipbookLayout, type FrameArt } from '../export/flipbook.ts';
 import { exportVideo } from '../export/video.ts';
 import { t } from '../i18n/index.ts';
-import { VIEW_HALF, makeCamera } from '../render/camera.ts';
+import { cameraFor } from '../render/camera.ts';
 import { traceCurve } from '../render/curve.ts';
 import { drawFrame, type Scene } from '../render/scene.ts';
 import type { Style } from '../render/theme.ts';
@@ -132,7 +132,7 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
     abort = new AbortController();
     videoButton.textContent = t('video.cancel');
     progress.hidden = false;
-    const camera = makeCamera(VIDEO_SIZE, VIDEO_SIZE);
+    const camera = cameraFor(VIDEO_SIZE, VIDEO_SIZE, scene.computed.box);
     try {
       const result = await exportVideo(
         (ctx, time) => drawFrame(ctx, scene, {
@@ -159,7 +159,7 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
     const scene = deps.scene();
     if (!scene) return;
     const note = await notePng(t('flipbook.note'), '#56647C').catch(() => undefined);
-    const pdf = await exportFlipbook(time => frameArt(scene, time), flipbookLayout(FLIPBOOK_FRAMES), { half: VIEW_HALF, notePng: note });
+    const pdf = await exportFlipbook(time => frameArt(scene, time), flipbookLayout(FLIPBOOK_FRAMES), { box: scene.computed.box, notePng: note });
     downloadBlob(new Blob([pdf as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }), 'line2fourier-flipbook.pdf');
     toast(t('flipbook.done'), '');
   });
@@ -168,7 +168,7 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
     /** Every animation frame: the live XY trace while playing, otherwise the period drawn once. */
     frame() {
       const style = deps.style();
-      const colors = { paper: style.paper, trace: style.brass, grid: style.orbit };
+      const colors = { paper: style.canvas, trace: style.drawing, grid: style.orbit };
       if (player.read(xs, ys)) {
         drawXY(xy, xs, ys, colors);
         staticDrawn = false;

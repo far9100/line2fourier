@@ -2,6 +2,7 @@
 // at 100%, cut along the marks and bind at the left. The layout is pure arithmetic in millimetres
 // (tested on its own); the PDF draws everything as vectors (DECISIONS.md D36).
 import type { Pt } from '../core/fourier.ts';
+import type { BBox } from '../core/path.ts';
 
 export const MM_TO_PT = 72 / 25.4;
 
@@ -93,8 +94,8 @@ export interface FrameArt {
 }
 
 export interface FlipbookOptions {
-  /** World units per millimetre are chosen so [-half, half] fits the shorter side of a card's art box. */
-  half: number;
+  /** The drawing's box: it fills each card's art box, with a margin, as on screen (DECISIONS.md D45). */
+  box: BBox;
   /** Page 1's printing instruction as a PNG (rendered by the page in its own fonts), or none. */
   notePng?: Uint8Array;
   title?: string;
@@ -111,7 +112,10 @@ export async function exportFlipbook(artAt: (t: number) => FrameArt, layout: Lay
   const pages = Array.from({ length: layout.pages }, () => doc.addPage([layout.pageWidth * MM_TO_PT, layout.pageHeight * MM_TO_PT]));
   const H = layout.pageHeight;
   const pt = (mm: number) => mm * MM_TO_PT;
-  const grey = rgb(0.55, 0.6, 0.68), ink = rgb(0.12, 0.17, 0.27), brass = rgb(0.72, 0.47, 0.12);
+  const grey = rgb(0.55, 0.6, 0.68), ink = rgb(0.12, 0.17, 0.27), black = rgb(0.07, 0.07, 0.07), brass = rgb(0.72, 0.47, 0.12);
+  const b = opt.box, margin = 1.08;
+  const boxW = Math.max(b.maxX - b.minX, 1e-9) * margin, boxH = Math.max(b.maxY - b.minY, 1e-9) * margin;
+  const bx = (b.minX + b.maxX) / 2, by = (b.minY + b.maxY) / 2;
 
   for (const page of pages) {
     for (const [x1, y1, x2, y2] of layout.marks) {
@@ -131,9 +135,9 @@ export async function exportFlipbook(artAt: (t: number) => FrameArt, layout: Lay
     const page = pages[c.page];
     const label = String(c.frame + 1);
     page.drawText(label, { x: pt(c.binding.x + 3), y: pt(H - c.binding.y - 7), size: 9, font, color: grey });
-    const a = c.art, s = Math.min(a.w, a.h) / 2 / opt.half;
+    const a = c.art, s = Math.min(a.w / boxW, a.h / boxH);
     const cx = a.x + a.w / 2, cy = a.y + a.h / 2;
-    const X = (x: number) => cx + s * x, Y = (y: number) => cy - s * y; // mm, y down (as SVG paths are)
+    const X = (x: number) => cx + s * (x - bx), Y = (y: number) => cy - s * (y - by); // mm, y down (as SVG paths are)
     const path = (pts: Pt[]) => pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(3)} ${Y(p[1]).toFixed(3)}`).join('');
     const art = artAt(c.t);
     const svg = { x: 0, y: pt(H), scale: MM_TO_PT };
@@ -145,8 +149,8 @@ export async function exportFlipbook(artAt: (t: number) => FrameArt, layout: Lay
     }
     if (art.arms.length > 1) page.drawSvgPath(path(art.arms), { ...svg, borderColor: ink, borderWidth: 0.3 });
     const paintWidth = Math.max(0.8, s * art.fillWidth); // mm: drawSvgPath scales the line width too
-    for (const piece of art.paint) if (piece.length > 1) page.drawSvgPath(path(piece), { ...svg, borderColor: brass, borderWidth: paintWidth, borderLineCap: LineCapStyle.Round });
-    for (const piece of art.trail) if (piece.length > 1) page.drawSvgPath(path(piece), { ...svg, borderColor: brass, borderWidth: 0.8 });
+    for (const piece of art.paint) if (piece.length > 1) page.drawSvgPath(path(piece), { ...svg, borderColor: black, borderWidth: paintWidth, borderLineCap: LineCapStyle.Round });
+    for (const piece of art.trail) if (piece.length > 1) page.drawSvgPath(path(piece), { ...svg, borderColor: black, borderWidth: 0.6 });
     page.drawCircle({ x: pt(X(art.tip[0])), y: pt(H - Y(art.tip[1])), size: 1.6, color: brass });
   }
   return doc.save({ useObjectStreams: false });

@@ -10,26 +10,12 @@
   <script type="module" src="./src/main.ts"></script>
 </head>
 <body>
-  <header class="top">
-    <div class="brand">
+  <div class="app">
+    <header class="top">
       <h1 class="brand-name">line2fourier</h1>
-      <p class="brand-tag" data-i18n="app.tagline">Draw a line with a chain of turning circles</p>
-    </div>
-    <div class="top-actions">
-      <button type="button" class="quiet" id="about-open" data-i18n="about.open">How it works</button>
-      <div class="lang" role="group" aria-label="Language" data-i18n-aria-label="lang.group">
-        <button type="button" data-lang="zh-TW" lang="zh-TW">中文</button>
-        <button type="button" data-lang="en" lang="en">EN</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="layout">
-    <section class="stage" aria-labelledby="stage-title">
-      <h2 id="stage-title" class="visually-hidden" data-i18n="stage.title">The drawing</h2>
       <div class="bar" role="toolbar" aria-label="Drawing controls" data-i18n-aria-label="bar.label">
         <div class="joined">
-          <button type="button" id="new-drawing" class="primary" data-i18n="ctrl.newDrawing">New drawing</button>
+          <button type="button" id="new-drawing" data-i18n="ctrl.newDrawing">New drawing</button>
           <label class="visually-hidden" for="generator" data-i18n="ctrl.generator">Kind of drawing</label>
           <select id="generator">
             <option value="creature" data-i18n="gen.creature">Creature</option>
@@ -39,20 +25,83 @@
         </div>
         <button type="button" id="draw" data-i18n="ctrl.draw">Draw your own</button>
         <button type="button" id="upload" data-i18n="ctrl.upload" data-i18n-title="ctrl.uploadTitle">Open a drawing</button>
-        <button type="button" id="demo" aria-pressed="false" data-i18n="ctrl.demo">Show convergence</button>
-        <button type="button" id="play" class="play" aria-pressed="false"><span id="play-label" data-i18n="ctrl.play">Play</span></button>
+        <button type="button" id="play" class="play primary" aria-pressed="false"><span id="play-label" data-i18n="ctrl.play">Play</span></button>
       </div>
-      <div class="canvas-wrap" id="canvas-wrap">
-        <canvas id="view" role="img" aria-label="Epicycles drawing the line" data-i18n-aria-label="canvas.label"></canvas>
-        <div class="draw-overlay" id="draw-overlay" hidden>
-          <p data-i18n="draw.hint">Press and drag to draw one line; let go to finish.</p>
-          <button type="button" id="draw-cancel" data-i18n="draw.cancel">Cancel</button>
+      <div class="top-actions">
+        <button type="button" class="quiet" id="about-open" data-i18n="about.open">How it works</button>
+        <div class="lang" role="group" aria-label="Language" data-i18n-aria-label="lang.group">
+          <button type="button" data-lang="zh-TW" lang="zh-TW">中文</button>
+          <button type="button" data-lang="en" lang="en">EN</button>
         </div>
       </div>
-      <p class="status" id="status"></p>
-      <section class="spectrum" aria-labelledby="spectrum-title">
-        <div class="spectrum-head">
-          <h2 id="spectrum-title" data-i18n="spectrum.title">Spectrum</h2>
+    </header>
+
+    <main class="layout">
+      <section class="stage" aria-labelledby="stage-title">
+        <h2 id="stage-title" class="visually-hidden" data-i18n="stage.title">The drawing</h2>
+        <div class="canvas-wrap" id="canvas-wrap">
+          <canvas id="view" role="img" aria-label="Epicycles drawing the line" data-i18n-aria-label="canvas.label"></canvas>
+          <div class="draw-overlay" id="draw-overlay" hidden>
+            <p data-i18n="draw.hint">Press and drag to draw one line; let go to finish.</p>
+            <button type="button" id="draw-cancel" data-i18n="draw.cancel">Cancel</button>
+          </div>
+          <p class="status" id="status"></p>
+          <div class="view-tools" role="group" aria-label="View" data-i18n-aria-label="view.tools">
+            <button type="button" id="view-zoom-out" aria-label="Zoom out" data-i18n-aria-label="view.zoomOut" data-i18n-title="view.zoomOut">−</button>
+            <output id="view-zoom" aria-live="off">1×</output>
+            <button type="button" id="view-zoom-in" aria-label="Zoom in" data-i18n-aria-label="view.zoomIn" data-i18n-title="view.zoomIn">+</button>
+            <button type="button" id="view-fit" aria-label="Whole drawing" data-i18n-aria-label="view.fit" data-i18n-title="view.fit">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M4.5 10.5l2.5-3 2 2 2.5-4"/></svg>
+            </button>
+            <button type="button" id="view-fullscreen" aria-pressed="false" aria-label="Full screen" data-i18n-aria-label="view.fullscreen" data-i18n-title="view.fullscreen">
+              <svg class="enter" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+              <svg class="leave" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <section class="group" aria-labelledby="circles-title">
+          <h2 id="circles-title" data-i18n="panel.circles">Circles</h2>
+          <div class="field">
+            <div class="field-head">
+              <label for="m-range" data-i18n="m.label">Number of circles</label>
+              <input type="number" id="m-number" min="1" step="1" inputmode="numeric" aria-label="Number of circles" data-i18n-aria-label="m.label">
+            </div>
+            <input type="range" id="m-range" min="0" step="1">
+          </div>
+          <div class="field">
+            <div class="field-head">
+              <label for="speed" data-i18n="speed.label">Speed</label>
+              <output id="speed-out" for="speed"></output>
+            </div>
+            <input type="range" id="speed" min="0" step="1">
+          </div>
+          <button type="button" id="demo" class="small" aria-pressed="false" data-i18n="ctrl.demo">Show convergence</button>
+        </section>
+
+        <section class="group" aria-labelledby="display-title">
+          <h2 id="display-title" data-i18n="panel.display">Show</h2>
+          <div class="checks">
+            <label><input type="checkbox" id="show-circles"><span data-i18n="view.circles">Show circles</span></label>
+            <label><input type="checkbox" id="show-jumps"><span data-i18n="view.jumps">Show pen-up moves</span><i class="swatch" aria-hidden="true"></i></label>
+            <label><input type="checkbox" id="show-original"><span data-i18n="view.original">Show the original</span></label>
+            <label><input type="checkbox" id="follow"><span data-i18n="view.follow">Follow the pen</span></label>
+          </div>
+        </section>
+
+        <section class="group" aria-labelledby="metrics-title">
+          <h2 id="metrics-title" data-i18n="metrics.title">How close</h2>
+          <dl class="metrics">
+            <div><dt data-i18n="metrics.rms">RMS error</dt><dd id="metric-rms"></dd></div>
+            <div id="metric-jumps-row" hidden><dt><span data-i18n="metrics.jumps">Pen-up share</span><i class="swatch" aria-hidden="true"></i></dt><dd id="metric-jumps"></dd></div>
+          </dl>
+          <p class="note" data-i18n="metrics.note">Errors are shares of the drawing's size. More circles, closer fit.</p>
+        </section>
+
+        <details class="group" id="spectrum-section">
+          <summary id="spectrum-title" data-i18n="spectrum.title">Spectrum</summary>
           <label class="spectrum-range"><span data-i18n="spectrum.range">Range</span>
             <select id="spectrum-range">
               <option value="auto" data-i18n="spectrum.auto">Auto</option>
@@ -64,51 +113,72 @@
               <option value="all" data-i18n="spectrum.all">All</option>
             </select>
           </label>
-        </div>
-        <canvas id="spectrum" tabindex="0" data-own-keys role="img" aria-label="Spectrum" data-i18n-aria-label="spectrum.label"></canvas>
-        <p class="note" id="spectrum-readout" aria-live="polite"></p>
-      </section>
-    </section>
+          <canvas id="spectrum" tabindex="0" data-own-keys role="img" aria-label="Spectrum" data-i18n-aria-label="spectrum.label"></canvas>
+          <p class="note" id="spectrum-readout" aria-live="polite"></p>
+        </details>
 
-    <aside class="panel">
-      <section class="card" aria-labelledby="circles-title">
-        <h2 id="circles-title" data-i18n="panel.circles">Circles</h2>
-        <div class="field">
-          <div class="field-head">
-            <label for="m-range" data-i18n="m.label">Number of circles</label>
-            <input type="number" id="m-number" min="1" step="1" inputmode="numeric" aria-label="Number of circles" data-i18n-aria-label="m.label">
+        <details class="group" id="export-section">
+          <summary id="export-title" data-i18n="export.title">Formula and files</summary>
+          <h3 class="sub" data-i18n="formula.title">The series</h3>
+          <div class="formula" id="formula" aria-live="off"></div>
+          <p class="note" id="formula-count"></p>
+          <div class="buttons">
+            <button type="button" id="copy-desmos" data-i18n="copy.desmos">Copy for Desmos</button>
+            <button type="button" id="copy-desmos-slider" data-i18n="copy.desmosSlider">Desmos, with an M slider</button>
+            <button type="button" id="copy-latex" data-i18n="copy.latex">Copy LaTeX</button>
           </div>
-          <input type="range" id="m-range" min="0" step="1">
-        </div>
-        <div class="field">
-          <div class="field-head">
-            <label for="speed" data-i18n="speed.label">Speed</label>
-            <output id="speed-out" for="speed"></output>
+          <p class="note" id="desmos-note" hidden></p>
+          <h3 class="sub" data-i18n="export.files">Files</h3>
+          <div class="buttons">
+            <button type="button" id="download-json" data-i18n="export.json">Coefficients (JSON)</button>
           </div>
-          <input type="range" id="speed" min="0" step="1">
-        </div>
-        <fieldset class="field">
-          <legend data-i18n="order.label">Order of the circles</legend>
-          <div class="segmented">
-            <label><input type="radio" name="order" value="magnitude"><span data-i18n="order.magnitude">By size</span></label>
-            <label><input type="radio" name="order" value="frequency"><span data-i18n="order.frequency">By frequency</span></label>
+          <div class="svg-row">
+            <label><span data-i18n="export.svgWidth">Width (mm)</span><input type="number" id="svg-width" min="10" max="3000" step="1" value="150"></label>
+            <label><span data-i18n="export.svgStroke">Line (mm)</span><input type="number" id="svg-stroke" min="0.05" max="10" step="0.05" value="0.3"></label>
+            <button type="button" id="download-svg" data-i18n="export.svg">Download SVG</button>
           </div>
-        </fieldset>
-        <div class="field checks">
-          <label><input type="checkbox" id="show-circles"><span data-i18n="view.circles">Show circles</span></label>
-          <label><input type="checkbox" id="show-original"><span data-i18n="view.original">Show the original</span></label>
-          <label><input type="checkbox" id="show-jumps"><span data-i18n="view.jumps">Show pen-up moves</span><i class="swatch" aria-hidden="true"></i></label>
-          <label><input type="checkbox" id="follow"><span data-i18n="view.follow">Follow the pen</span></label>
-        </div>
-        <div class="field" id="zoom-field" hidden>
-          <div class="field-head">
-            <label for="zoom" data-i18n="view.zoom">Zoom</label>
-            <output id="zoom-out" for="zoom"></output>
+          <div class="buttons">
+            <button type="button" id="project-save" data-i18n="project.save">Save project</button>
+            <button type="button" id="project-open" data-i18n="project.open">Open project</button>
           </div>
-          <input type="range" id="zoom" min="0" max="100" step="1">
-        </div>
-        <details class="advanced">
-          <summary data-i18n="advanced">More settings</summary>
+          <label class="embed" id="embed-row" hidden><input type="checkbox" id="embed-source"><span data-i18n="project.embed">Include the source file</span></label>
+        </details>
+
+        <details class="group" id="outputs-section">
+          <summary id="outputs-title" data-i18n="outputs.title">Make something</summary>
+          <div class="buttons">
+            <button type="button" id="video-export" data-i18n="video.export">Video of one cycle</button>
+            <button type="button" id="flipbook-export" data-i18n="flipbook.export">Flipbook (PDF)</button>
+          </div>
+          <p class="note" id="video-progress" aria-live="polite" hidden></p>
+          <h3 class="sub" data-i18n="scope.title">Oscilloscope audio</h3>
+          <div class="scope-row">
+            <canvas id="xy" role="img" aria-label="XY preview" data-i18n-aria-label="scope.preview"></canvas>
+            <div class="scope-controls">
+              <label><span data-i18n="scope.f0">Base frequency</span>
+                <select id="f0"></select>
+              </label>
+              <label><span data-i18n="scope.volume">Volume</span>
+                <input type="range" id="volume" min="0" max="100" step="1" value="15">
+              </label>
+              <div class="buttons">
+                <button type="button" id="audio-toggle" aria-pressed="false"><span id="audio-label" data-i18n="scope.play">Play</span></button>
+                <button type="button" id="wav-export" data-i18n="scope.download">WAV</button>
+              </div>
+            </div>
+          </div>
+          <p class="note" id="scope-note"></p>
+        </details>
+
+        <details class="group" id="advanced">
+          <summary id="advanced-title" data-i18n="advanced">More settings</summary>
+          <fieldset class="field">
+            <legend data-i18n="order.label">Order of the circles</legend>
+            <div class="segmented">
+              <label><input type="radio" name="order" value="magnitude"><span data-i18n="order.magnitude">By size</span></label>
+              <label><input type="radio" name="order" value="frequency"><span data-i18n="order.frequency">By frequency</span></label>
+            </div>
+          </fieldset>
           <div class="field">
             <label for="n-select" data-i18n="n.label">Sample points N</label>
             <select id="n-select"></select>
@@ -121,90 +191,21 @@
             </div>
           </div>
         </details>
-      </section>
-
-      <section class="card" aria-labelledby="metrics-title">
-        <h2 id="metrics-title" data-i18n="metrics.title">How close</h2>
-        <dl class="metrics">
-          <div><dt data-i18n="metrics.energy">Energy captured</dt><dd id="metric-energy"></dd></div>
-          <div><dt data-i18n="metrics.rms">RMS error</dt><dd id="metric-rms"></dd></div>
-          <div><dt data-i18n="metrics.mean">Mean deviation</dt><dd id="metric-mean"></dd></div>
-          <div><dt data-i18n="metrics.largest">Largest circle</dt><dd id="metric-largest"></dd></div>
-          <div id="metric-jumps-row" hidden><dt><span data-i18n="metrics.jumps">Pen-up share</span><i class="swatch" aria-hidden="true"></i></dt><dd id="metric-jumps"></dd></div>
-        </dl>
-        <p class="note" data-i18n="metrics.note">Errors are shares of the drawing's size. More circles, closer fit.</p>
-      </section>
-
-      <section class="card" aria-labelledby="formula-title">
-        <h2 id="formula-title" data-i18n="formula.title">The series</h2>
-        <div class="formula" id="formula" aria-live="off"></div>
-        <p class="note" id="formula-count"></p>
-        <div class="buttons">
-          <button type="button" id="copy-desmos" data-i18n="copy.desmos">Copy for Desmos</button>
-          <button type="button" id="copy-desmos-slider" data-i18n="copy.desmosSlider">Desmos, with an M slider</button>
-          <button type="button" id="copy-latex" data-i18n="copy.latex">Copy LaTeX</button>
-        </div>
-        <p class="note" id="desmos-note" hidden></p>
-      </section>
-
-      <section class="card" aria-labelledby="export-title">
-        <h2 id="export-title" data-i18n="export.title">Save</h2>
-        <div class="buttons">
-          <button type="button" id="download-json" data-i18n="export.json">Coefficients (JSON)</button>
-        </div>
-        <div class="svg-row">
-          <label><span data-i18n="export.svgWidth">Width (mm)</span><input type="number" id="svg-width" min="10" max="3000" step="1" value="150"></label>
-          <label><span data-i18n="export.svgStroke">Line (mm)</span><input type="number" id="svg-stroke" min="0.05" max="10" step="0.05" value="0.3"></label>
-          <button type="button" id="download-svg" data-i18n="export.svg">Download SVG</button>
-        </div>
-        <div class="buttons">
-          <button type="button" id="project-save" data-i18n="project.save">Save project</button>
-          <button type="button" id="project-open" data-i18n="project.open">Open project</button>
-        </div>
-        <label class="embed" id="embed-row" hidden><input type="checkbox" id="embed-source"><span data-i18n="project.embed">Include the source file</span></label>
-      </section>
-
-      <section class="card" aria-labelledby="outputs-title">
-        <h2 id="outputs-title" data-i18n="outputs.title">Make something</h2>
-        <div class="buttons">
-          <button type="button" id="video-export" data-i18n="video.export">Video of one cycle</button>
-          <button type="button" id="flipbook-export" data-i18n="flipbook.export">Flipbook (PDF)</button>
-        </div>
-        <p class="note" id="video-progress" aria-live="polite" hidden></p>
-        <h3 class="sub" data-i18n="scope.title">Oscilloscope audio</h3>
-        <div class="scope-row">
-          <canvas id="xy" role="img" aria-label="XY preview" data-i18n-aria-label="scope.preview"></canvas>
-          <div class="scope-controls">
-            <label><span data-i18n="scope.f0">Base frequency</span>
-              <select id="f0"></select>
-            </label>
-            <label><span data-i18n="scope.volume">Volume</span>
-              <input type="range" id="volume" min="0" max="100" step="1" value="15">
-            </label>
-            <div class="buttons">
-              <button type="button" id="audio-toggle" aria-pressed="false"><span id="audio-label" data-i18n="scope.play">Play</span></button>
-              <button type="button" id="wav-export" data-i18n="scope.download">WAV</button>
-            </div>
-          </div>
-        </div>
-        <p class="note" id="scope-note"></p>
-      </section>
-    </aside>
-  </main>
-
-  <footer class="foot">
-    <p data-i18n="footer.privacy">Everything runs in your browser: nothing you draw or open is uploaded.</p>
-    <p data-i18n="footer.license">Free software under the GNU GPL v3 or later.</p>
-  </footer>
+      </aside>
+    </main>
+  </div>
 
   <dialog id="about" aria-labelledby="about-title">
     <h2 id="about-title" data-i18n="about.title">How this is drawn</h2>
+    <p class="about-tag" data-i18n="app.tagline">Draw a line with a chain of turning circles</p>
     <p data-i18n="about.p1"></p>
     <p data-i18n="about.p2"></p>
     <p data-i18n="about.p3"></p>
     <p data-i18n="about.p4"></p>
     <h3 data-i18n="about.keysTitle">Keys</h3>
     <p data-i18n="about.keys"></p>
+    <p class="note" data-i18n="footer.privacy">Everything runs in your browser: nothing you draw or open is uploaded.</p>
+    <p class="note" data-i18n="footer.license">Free software under the GNU GPL v3 or later.</p>
     <div class="dialog-actions"><button type="button" id="about-close" data-i18n="about.close">Close</button></div>
   </dialog>
 

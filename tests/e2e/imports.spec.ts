@@ -21,8 +21,8 @@ const evalDebug = <T,>(page: Page, fn: string, arg?: unknown) =>
     return typeof v === 'function' ? (v as (x: unknown) => unknown)(a) : v;
   }, [fn, arg] as const) as Promise<T>;
 
-/** Is there a pixel of the given colour within r pixels of the point? */
-async function colourNear(page: Page, colour: 'brass' | 'violet', p: Point, r = 2): Promise<boolean> {
+/** Is there a pixel of the given colour within r pixels of the point (on the light theme's white)? */
+async function colourNear(page: Page, colour: 'ink' | 'grey', p: Point, r = 2): Promise<boolean> {
   return page.evaluate(([x, y, rad, which]) => {
     const c = document.querySelector('#view') as HTMLCanvasElement;
     const ratio = c.width / c.getBoundingClientRect().width;
@@ -30,16 +30,17 @@ async function colourNear(page: Page, colour: 'brass' | 'violet', p: Point, r = 
     const data = c.getContext('2d')!.getImageData(Math.round((x - rad) * ratio), Math.round((y - rad) * ratio), Math.round(size * ratio), Math.round(size * ratio)).data;
     for (let i = 0; i < data.length; i += 4) {
       const [red, green, blue] = [data[i], data[i + 1], data[i + 2]];
-      // brass (the drawing): red well above blue; violet (the jumps), even faint: blue above green,
-      // and red above green too, which the grey-blue of the circles and the grid never has
-      if (which === 'brass' ? blue - red < -18 : blue - green > 20 && red > green) return true;
+      // ink (the drawing, black): dark; grey (the pen-up moves): neutral and between the drawing's
+      // black and the faint full curve's light grey
+      const hi = Math.max(red, green, blue), lo = Math.min(red, green, blue);
+      if (which === 'ink' ? hi < 110 : hi - lo < 30 && green >= 120 && green <= 215) return true;
     }
     return false;
   }, [p[0], p[1], r, colour] as const);
 }
-const brassNear = (page: Page, p: Point, r = 2) => colourNear(page, 'brass', p, r);
+const inkNear = (page: Page, p: Point, r = 2) => colourNear(page, 'ink', p, r);
 
-test('an SVG with four shapes: chained with jumps, the jumps drawn in their own colour or hidden, the share shown', async ({ page }) => {
+test('an SVG with four shapes: chained with jumps, drawn black with grey jumps that can be hidden, the share shown', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); // paused, with the whole approximation drawn
   await open(page);
   await upload(page, 'four-shapes.svg');
@@ -51,26 +52,25 @@ test('an SVG with four shapes: chained with jumps, the jumps drawn in their own 
   await expect(page.locator('#metric-jumps')).toContainText('原始順序');
   await expect(page.locator('#status')).toContainText('four-shapes.svg');
 
-  // Circles and the original out of the way: brass along the drawing, never along the jumps,
-  // which are drawn in violet (D44) until they are hidden.
+  // The circles out of the way (the original is hidden already): black along the drawing, never
+  // along the jumps, which are grey (D44, D45) until they are hidden.
   await page.getByText('顯示圓', { exact: true }).click();
-  await page.getByText('顯示原始線稿', { exact: true }).click();
   await page.waitForTimeout(200);
   const jumps = await evalDebug<Point[]>(page, 'mids', 2);
   const inks = await evalDebug<Point[]>(page, 'mids', 0);
   expect(jumps.length).toBe(4); // three between the shapes and the one back to the start
-  for (const p of jumps) expect(await brassNear(page, p), `jump at ${p}`).toBe(false);
-  let violet = 0;
-  for (const p of jumps) if (await colourNear(page, 'violet', p, 4)) violet++;
-  expect(violet).toBeGreaterThanOrEqual(3);
+  for (const p of jumps) expect(await inkNear(page, p), `jump at ${p}`).toBe(false);
+  let grey = 0;
+  for (const p of jumps) if (await colourNear(page, 'grey', p, 4)) grey++;
+  expect(grey).toBeGreaterThanOrEqual(3);
   let drawn = 0;
-  for (const p of inks) if (await brassNear(page, p, 3)) drawn++;
+  for (const p of inks) if (await inkNear(page, p, 3)) drawn++;
   expect(drawn / inks.length).toBeGreaterThan(0.9);
 
   await page.getByText('顯示跳線', { exact: true }).click();
   await expect.poll(async () => (await debug(page)).state.view.showJumps).toBe(false);
   await page.waitForTimeout(200);
-  for (const p of jumps) expect(await colourNear(page, 'violet', p, 4), `jump at ${p}`).toBe(false);
+  for (const p of jumps) expect(await colourNear(page, 'grey', p, 4), `jump at ${p}`).toBe(false);
 });
 
 test('line2func curves.json: strokes chained, fill hatching left out and said so', async ({ page }) => {
@@ -84,6 +84,8 @@ test('line2func curves.json: strokes chained, fill hatching left out and said so
 
 test('the spectrum shows exactly the circles in use, and picking one marks it', async ({ page }) => {
   await open(page, 'gen=star&seed=42&play=0&M=50');
+  await page.locator('#spectrum-title').click();
+  await page.locator('#advanced-title').click();
   for (const order of ['依大小', '依頻率']) {
     await page.getByText(order, { exact: true }).click();
     for (const M of [1, 50, 300]) {
@@ -99,8 +101,11 @@ test('the spectrum shows exactly the circles in use, and picking one marks it', 
       expect(d.frame!.circlesDrawn).toBe(visible.length);
     }
   }
-  // Pick the k of the fifth circle in use by clicking its stem.
+  // Pick the k of the fifth circle in use by clicking its stem (at 50 circles, a stem is a few
+  // pixels apart in the narrow panel; at 300 the arrow keys pick one).
   await page.getByText('依大小', { exact: true }).click();
+  await page.locator('#m-number').fill('50');
+  await page.locator('#m-number').press('Enter');
   const d = await debug(page);
   const k = d.used[4];
   await page.locator('#spectrum').scrollIntoViewIfNeeded();
@@ -118,6 +123,7 @@ test('the spectrum shows exactly the circles in use, and picking one marks it', 
 
 test('the spectrum takes its own arrow keys; the page’s arrows still change M', async ({ page }) => {
   await open(page, 'gen=creature&seed=1&play=0');
+  await page.locator('#spectrum-title').click();
   await page.locator('#spectrum').focus();
   await page.keyboard.press('ArrowRight');
   expect((await debug(page)).state.selectedK).toBe(1);
@@ -131,7 +137,7 @@ test('the spectrum takes its own arrow keys; the page’s arrows still change M'
 test('following the pen keeps it in the middle of the canvas', async ({ page }) => {
   await open(page, 'gen=scribble&seed=4');
   await page.getByText('跟隨筆尖', { exact: true }).click();
-  await expect(page.locator('#zoom-field')).toBeVisible();
+  await expect(page.locator('#view-zoom')).toHaveText('8×');
   await page.waitForTimeout(300);
   const d = await debug(page);
   const box = (await page.locator('#view').boundingBox())!;
@@ -154,6 +160,7 @@ test('a file dropped on the page is opened', async ({ page }) => {
 
 test('a project with the SVG embedded opens without asking; without it, the file is asked for', async ({ page }) => {
   await open(page, 'play=0');
+  await page.locator('#export-title').click();
   await upload(page, 'four-shapes.svg');
   await page.locator('#m-number').fill('40');
   await page.locator('#m-number').press('Enter');
@@ -210,14 +217,13 @@ test('a picture with a solid area: outlined, painted in with the wide pen, and s
   expect((d as unknown as { fillWidth: number }).fillWidth).toBeGreaterThan(0);
 
   await page.getByText('顯示圓', { exact: true }).click();
-  await page.getByText('顯示原始線稿', { exact: true }).click();
   await page.waitForTimeout(200);
   const paint = await evalDebug<Point[]>(page, 'mids', 3);
   expect(paint.length).toBeGreaterThan(10);
   let drawn = 0;
-  for (const p of paint) if (await brassNear(page, p, 2)) drawn++;
+  for (const p of paint) if (await inkNear(page, p, 2)) drawn++;
   expect(drawn / paint.length).toBeGreaterThan(0.9);
-  // Solid, not hatched: brass in the middle of the disk too, between the rings.
+  // Solid, not hatched: black in the middle of the disk too, between the rings.
   const mid: Point = [paint.reduce((a, p) => a + p[0], 0) / paint.length, paint.reduce((a, p) => a + p[1], 0) / paint.length];
-  expect(await brassNear(page, mid, 1)).toBe(true);
+  expect(await inkNear(page, mid, 1)).toBe(true);
 });

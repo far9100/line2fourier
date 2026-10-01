@@ -118,7 +118,7 @@ export function parseProject(text: string): ParsedProject | { error: ProjectErro
   const zoom = typeof v.zoom === 'number' && Number.isFinite(v.zoom) ? Math.min(ZOOM_MAX, Math.max(1, v.zoom)) : 8;
   const view: ViewState = {
     showCircles: v.showCircles !== false,
-    showOriginal: v.showOriginal !== false,
+    showOriginal: v.showOriginal === true,
     showJumps: v.showJumps !== false,
     follow: v.follow === true,
     zoom,

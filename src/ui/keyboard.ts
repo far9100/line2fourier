@@ -1,5 +1,6 @@
 // Keys (spec §6): Space plays and pauses, ← / → change the number of circles (Shift: by one), D starts
-// drawing, Esc cancels drawing or the demo, Ctrl/⌘+O opens a file.
+// drawing, Esc cancels drawing or the demo, Ctrl/⌘+O opens a file; + / − zoom, 0 shows the whole
+// drawing, F goes full screen (DECISIONS.md D45).
 
 export interface KeyActions {
   togglePlay(): void;
@@ -7,6 +8,9 @@ export interface KeyActions {
   draw(): void;
   escape(): void;
   openFile(): void;
+  zoom(dir: 1 | -1): void;
+  fit(): void;
+  fullscreen(): void;
 }
 
 function isEditable(el: EventTarget | null): boolean {
@@ -41,6 +45,13 @@ export function bindKeys(actions: KeyActions): void {
       actions.step(e.key === 'ArrowRight' ? 1 : -1, e.shiftKey);
     } else if ((e.key === 'd' || e.key === 'D' || e.code === 'KeyD') && !e.repeat) {
       actions.draw();
+    } else if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      actions.zoom(e.key === '+' || e.key === '=' ? 1 : -1);
+    } else if ((e.key === '0' || e.code === 'Digit0') && !e.repeat) {
+      actions.fit();
+    } else if ((e.key === 'f' || e.key === 'F' || e.code === 'KeyF') && !e.repeat) {
+      actions.fullscreen();
     }
   });
 }

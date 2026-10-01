@@ -69,7 +69,7 @@ export function defaultState(source: SourceSpec, lang: Lang, reducedMotion: bool
     M: DEFAULT_M,
     order: 'magnitude',
     speed: 1,
-    view: { showCircles: true, showOriginal: true, showJumps: true, follow: false, zoom: 8 },
+    view: { showCircles: true, showOriginal: false, showJumps: true, follow: false, zoom: 8 },
     mode: 'play',
     playing: !reducedMotion,
     demo: null,

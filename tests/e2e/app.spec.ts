@@ -25,7 +25,7 @@ test('switches to English and remembers it', async ({ page }) => {
   await page.getByRole('button', { name: 'EN' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.locator('#new-drawing')).toHaveText('New drawing');
-  await expect(page.locator('#metric-largest')).toContainText('per cycle');
+  await expect(page.locator('#demo')).toHaveText('Show convergence');
   await page.reload();
   await expect(page.locator('#new-drawing')).toHaveText('New drawing');
   await page.getByRole('button', { name: '中文' }).click();
@@ -106,12 +106,12 @@ test('reduced motion: starts paused, with the whole approximation shown', async 
 test('order, N and the toggles change what is computed and drawn', async ({ page }) => {
   await open(page, 'gen=star&seed=42&play=0');
   const bySize = await debug(page);
+  await page.locator('#advanced-title').click();
   await page.getByText('依頻率', { exact: true }).click();
   const byFreq = await debug(page);
   expect(byFreq.state.order).toBe('frequency');
   expect(byFreq.used.slice(0, 4)).toEqual([1, -1, 2, -2]);
   expect(byFreq.metrics.rmsError).toBeGreaterThanOrEqual(bySize.metrics.rmsError);
-  await page.locator('summary').click();
   await page.locator('#n-select').selectOption('4096');
   expect((await debug(page)).N).toBe(4096);
   await page.getByText('顯示圓', { exact: true }).click();

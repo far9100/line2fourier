@@ -1,18 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatEnergy, formatShare } from '../../src/ui/format.ts';
+import { formatShare } from '../../src/ui/format.ts';
 import { longEnough, MIN_LENGTH_PX, MIN_POINTS } from '../../src/ui/freehand.ts';
 import type { Pt } from '../../src/core/fourier.ts';
 
 describe('metric formatting', () => {
-  it('shows the energy ratio down to the first digit short of 100%, never rounding up to 100%', () => {
-    expect(formatEnergy(1)).toBe('100%');
-    expect(formatEnergy(0.99985)).toBe('99.985%');
-    expect(formatEnergy(0.9999996)).toBe('99.999960%');
-    expect(formatEnergy(0.95)).toBe('95.0%');
-    expect(formatEnergy(0.5)).toBe('50.0%');
-    expect(formatEnergy(0.99999999999)).not.toBe('100%');
-  });
-
   it('shows lengths as a share of the drawing size', () => {
     expect(formatShare(0.2, 2)).toBe('10.0%');
     expect(formatShare(0.0071, 2)).toBe('0.355%');

@@ -127,7 +127,7 @@ describe('flipbook (spec §8)', () => {
       arms: [[0, 0], [0.5, 0]] as [number, number][],
       tip: [t, t] as [number, number],
     });
-    const bytes = await exportFlipbook(art, layout, { half: 1.35 });
+    const bytes = await exportFlipbook(art, layout, { box: { minX: -1, minY: -1, maxX: 1, maxY: 1 } });
     const { PDFDocument, PDFName } = await import('pdf-lib');
     const doc = await PDFDocument.load(bytes);
     expect(doc.getPageCount()).toBe(4);

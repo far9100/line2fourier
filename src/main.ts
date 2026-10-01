@@ -6,7 +6,7 @@ import { createPipeline, type Computed, type Ordered } from './app/pipeline.ts';
 import { bytesToDataUrl, dataUrlToBytes, decodeImage } from './app/image.ts';
 import { detectKind, finishImport, imageStrokes, prepareImport, sha256Hex, type Prepared } from './app/importer.ts';
 import { parseProject, projectText, type ProjectFile } from './app/project.ts';
-import { defaultState, normalizeState, type AppState, type ImportKind, type ImportedSource, type SourceSpec } from './app/state.ts';
+import { ZOOM_MAX, defaultState, normalizeState, type AppState, type ImportKind, type ImportedSource, type SourceSpec } from './app/state.ts';
 import { createStore } from './app/store.ts';
 import { partialCurve, type Pt } from './core/fourier.ts';
 import { GENERATORS, newSeed, type GeneratorName } from './core/generators.ts';
@@ -22,12 +22,13 @@ import { CanvasView } from './render/canvasView.ts';
 import { curveEvents, tipAt } from './render/curve.ts';
 import { buildScene } from './render/scene.ts';
 import { SpectrumView, autoRange } from './render/spectrumView.ts';
-import { formatEnergy, formatShare } from './ui/format.ts';
+import { formatShare } from './ui/format.ts';
 import { renderMath } from './ui/formula.ts';
 import { startFreehand } from './ui/freehand.ts';
 import { bindKeys } from './ui/keyboard.ts';
 import { mountOutputs } from './ui/outputs.ts';
 import { toast } from './ui/toast.ts';
+import { bindViewGestures } from './ui/viewGestures.ts';
 import { createWorkerClient } from './worker/client.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector(selector) as T;
@@ -41,6 +42,8 @@ function writeLocal(key: string, value: string): void {
 }
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Just before the end of a cycle: the whole curve drawn, the pen back near its start. */
+const WHOLE = 1 - 1e-9;
 
 // ---------------------------------------------------------------- state
 
@@ -96,6 +99,8 @@ function recompute(s: AppState): boolean {
   }
   timings.recompute = performance.now() - started;
   const changed = !computed || next.approx !== computed.approx || next.spans !== computed.spans;
+  // A new drawing is shown whole; changing M, N or the order leaves the view where it is.
+  if (!computed || next.strokes !== computed.strokes) view.fitTo(next.box);
   computed = next;
   if (changed) {
     const { c0, terms } = next.ordered;
@@ -140,17 +145,23 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 
+/** Following the pen: it stays in the middle, at the zoom kept for following. */
+const following = (s: AppState) => s.view.follow && s.mode !== 'draw';
+
 function draw(): void {
   const s = store.get();
   const drawing = s.mode === 'draw';
-  let follow: Pt | null = null;
-  if (s.view.follow && !drawing && computed) {
+  // Paused for reduced motion and not started: the whole curve, as the spec asks.
+  const t = reducedMotion && !s.playing && tCycle === 0 ? WHOLE : tCycle;
+  let camera = view.freeCamera();
+  if (following(s) && computed) {
     const { c0, terms } = computed.ordered;
-    follow = tipAt(c0, terms, computed.M, tCycle);
+    camera = view.followCamera(tipAt(c0, terms, computed.M, t), s.view.zoom);
   }
+  showZoom(following(s) ? s.view.zoom : view.zoom);
   view.render({
-    t: tCycle,
-    camera: follow ? view.camera(follow, s.view.zoom) : view.baseCamera(),
+    t,
+    camera,
     showCircles: s.view.showCircles,
     showOriginal: s.view.showOriginal || drawing,
     showJumps: s.view.showJumps,
@@ -231,14 +242,76 @@ $<HTMLInputElement>('#show-jumps').addEventListener('change', e => {
 });
 nSelect.addEventListener('change', () => store.set({ N: Number(nSelect.value) as NSize }));
 
-// Following the pen (spec §6): the zoom slider is logarithmic, 1× to 50×.
-const zoomRange = $<HTMLInputElement>('#zoom');
-const zoomOf = (v: number) => 50 ** (v / 100);
+// ---------------------------------------------------------------- moving around the drawing (DECISIONS.md D45)
+
+// Following the pen (spec §6) keeps its own zoom, 1× to 50× the whole drawing, saved with the project;
+// the free view zooms from ½× to 64× and is not saved.
 $<HTMLInputElement>('#follow').addEventListener('change', e => {
   store.set({ view: { ...store.get().view, follow: (e.target as HTMLInputElement).checked } });
 });
-zoomRange.addEventListener('input', () => {
-  store.set({ view: { ...store.get().view, zoom: Math.round(zoomOf(Number(zoomRange.value)) * 10) / 10 } });
+
+const zoomOut = $<HTMLOutputElement>('#view-zoom');
+let zoomShown = '';
+function showZoom(zoom: number): void {
+  const text = `${zoom < 10 ? zoom.toFixed(1).replace(/\.0$/, '') : Math.round(zoom)}×`;
+  if (text !== zoomShown) zoomOut.textContent = zoomShown = text;
+}
+
+function zoomView(factor: number, x = view.width / 2, y = view.height / 2): void {
+  const s = store.get();
+  if (following(s)) {
+    const zoom = Math.min(ZOOM_MAX, Math.max(1, Math.round(s.view.zoom * factor * 100) / 100));
+    store.set({ view: { ...s.view, zoom } });
+  } else {
+    view.zoomBy(factor, x, y);
+  }
+  dirty = true;
+}
+
+function panView(dx: number, dy: number): void {
+  const s = store.get();
+  if (following(s)) {
+    // Taking hold of the view stops following, without a jump.
+    if (view.lastCamera) view.takeView(view.lastCamera);
+    store.set({ view: { ...s.view, follow: false } });
+  }
+  view.panBy(dx, dy);
+  dirty = true;
+}
+
+function fitView(): void {
+  const s = store.get();
+  if (s.view.follow) store.set({ view: { ...s.view, follow: false } });
+  view.fit();
+  dirty = true;
+}
+
+const canvasWrap = $('#canvas-wrap');
+const fullscreenButton = $<HTMLButtonElement>('#view-fullscreen');
+fullscreenButton.hidden = !document.fullscreenEnabled;
+function toggleFullscreen(): void {
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  else if (document.fullscreenEnabled) void canvasWrap.requestFullscreen().catch(() => undefined);
+}
+document.addEventListener('fullscreenchange', () => {
+  const on = document.fullscreenElement === canvasWrap;
+  fullscreenButton.setAttribute('aria-pressed', String(on));
+  const key = on ? 'view.exitFullscreen' : 'view.fullscreen';
+  fullscreenButton.dataset.i18nAriaLabel = fullscreenButton.dataset.i18nTitle = key;
+  fullscreenButton.setAttribute('aria-label', t(key));
+  fullscreenButton.title = t(key);
+});
+
+$('#view-zoom-in').addEventListener('click', () => zoomView(1.5));
+$('#view-zoom-out').addEventListener('click', () => zoomView(1 / 1.5));
+$('#view-fit').addEventListener('click', fitView);
+fullscreenButton.addEventListener('click', toggleFullscreen);
+bindViewGestures(view.canvas, {
+  enabled: () => store.get().mode !== 'draw',
+  zoom: zoomView,
+  pan: panView,
+  reset: fitView,
+  dragging: on => canvasWrap.classList.toggle('panning', on),
 });
 
 // The spectrum panel: pick a term with the pointer or the arrow keys; Esc lets go of it.
@@ -518,6 +591,9 @@ bindKeys({
     else if (s.demo) toggleDemo();
   },
   openFile: () => fileInput.click(),
+  zoom: dir => zoomView(dir > 0 ? 1.5 : 1 / 1.5),
+  fit: fitView,
+  fullscreen: toggleFullscreen,
 });
 
 // ---------------------------------------------------------------- showing the state
@@ -547,10 +623,6 @@ function showControls(s: AppState): void {
   $<HTMLInputElement>('#show-original').checked = s.view.showOriginal;
   $<HTMLInputElement>('#show-jumps').checked = s.view.showJumps;
   $<HTMLInputElement>('#follow').checked = s.view.follow;
-  $('#zoom-field').hidden = !s.view.follow;
-  zoomRange.value = String(Math.round((100 * Math.log(s.view.zoom)) / Math.log(50)));
-  $('#zoom-out').textContent = `${s.view.zoom.toFixed(1)}×`;
-  zoomRange.setAttribute('aria-valuetext', `${s.view.zoom.toFixed(1)}×`);
   nSelect.value = String(s.N);
   if (s.source.type === 'random') {
     generatorSelect.value = s.source.generator;
@@ -570,14 +642,8 @@ function showControls(s: AppState): void {
 
 function showMetrics(): void {
   if (!computed) return;
-  const c = computed, size = c.size;
-  $('#metric-energy').textContent = formatEnergy(c.metrics.energy);
-  $('#metric-rms').textContent = formatShare(c.metrics.rmsError, size);
-  $('#metric-mean').textContent = formatShare(c.metrics.meanDeviation, size);
-  const big = c.largest;
-  $('#metric-largest').textContent = big
-    ? t(big.k > 0 ? 'metrics.largestCcw' : 'metrics.largestCw', { r: formatShare(big.amp, size), n: Math.abs(big.k) })
-    : '—';
+  const c = computed;
+  $('#metric-rms').textContent = formatShare(c.metrics.rmsError, c.size);
   // Spec §4.6: the share of the path that is pen-up jumps, against the file's own order.
   const src = store.get().source;
   $('#metric-jumps-row').hidden = c.jumpRatio === 0;
@@ -660,7 +726,7 @@ Object.defineProperty(window, '__l2f', {
   value: Object.freeze({
     debug() {
       const s = store.get();
-      const cam = view.lastCamera ?? view.baseCamera();
+      const cam = view.lastCamera ?? view.freeCamera();
       const joints = view.scene?.joints;
       const circles = computed.ordered.terms.slice(0, computed.M).map((c, j) => ({
         k: c.k,
@@ -689,6 +755,10 @@ Object.defineProperty(window, '__l2f', {
           : null,
         spectrumK: spectrumK(s),
         fillWidth: computed.path.fillWidth,
+        /** The free view's zoom (1: the whole drawing) and the scale in pixels per world unit. */
+        viewZoom: view.zoom,
+        scale: cam.s,
+        camera: { ...cam },
         /** Midpoints of the original path's segments of each kind, on screen (0 ink, 1 closure, 2 jump, 3 fill). */
         mids: (kind: number) => Array.from(computed.path.kinds).flatMap((k, i) => {
           if (k !== kind) return [];

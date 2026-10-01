@@ -1,10 +1,15 @@
-// World (math, y up) ↔ screen (CSS pixels, y down). The scale depends only on the canvas size, never
-// on the drawing, so a freehand line stays where and as large as it was drawn, and the view does
-// not jump when M changes.
+// World (math, y up) ↔ screen (CSS pixels, y down). The view is fitted to the drawing: its bounding
+// box, with a small margin, fills the canvas (DECISIONS.md D45). On top of that the viewer can zoom
+// about any point and move the view, or have it follow the pen.
 import type { Pt } from '../core/fourier.ts';
+import type { BBox } from '../core/path.ts';
 
-/** World units from the centre to the nearest canvas edge: [-1, 1]² plus a margin for the circles. */
-export const VIEW_HALF = 1.35;
+/** Space left around the drawing on every side, as a share of its long side. */
+export const FIT_MARGIN = 0.04;
+/** How far the free view zooms out and in, relative to the whole drawing. */
+export const ZOOM_RANGE = { min: 0.5, max: 64 };
+/** The box a view shows before there is a drawing: the [-1, 1]² every generated drawing fills. */
+export const UNIT_BOX: BBox = { minX: -1, minY: -1, maxX: 1, maxY: 1 };
 
 export interface Camera {
   /** CSS pixels per world unit. */
@@ -16,15 +21,29 @@ export interface Camera {
   oy: number;
 }
 
-export function makeCamera(width: number, height: number, follow: Pt | null = null, zoom = 1): Camera {
-  const base = Math.min(width, height) / 2 / VIEW_HALF;
+/** Pixels per world unit at which `box`, with its margin, just fits a width × height canvas. */
+export function fitScale(width: number, height: number, box: BBox): number {
+  const w = box.maxX - box.minX, h = box.maxY - box.minY;
+  const pad = 2 * FIT_MARGIN * Math.max(w, h, 1e-9);
+  return Math.min(width / (w + pad), height / (h + pad));
+}
+
+/** The camera showing `box` zoomed `zoom` times, with `center` (default: the box's centre) in the middle. */
+export function cameraFor(width: number, height: number, box: BBox, zoom = 1, center: Pt | null = null): Camera {
   return {
-    s: follow ? base * zoom : base,
-    cx: follow ? follow[0] : 0,
-    cy: follow ? follow[1] : 0,
+    s: fitScale(width, height, box) * zoom,
+    cx: center ? center[0] : (box.minX + box.maxX) / 2,
+    cy: center ? center[1] : (box.minY + box.maxY) / 2,
     ox: width / 2,
     oy: height / 2,
   };
+}
+
+/** The same camera with its scale multiplied by `factor` and the world point under (sx, sy) kept there. */
+export function zoomAbout(c: Camera, factor: number, sx: number, sy: number): Camera {
+  const [wx, wy] = toWorld(c, sx, sy);
+  const s = c.s * factor;
+  return { ...c, s, cx: wx - (sx - c.ox) / s, cy: wy + (sy - c.oy) / s };
 }
 
 export function toScreen(c: Camera, x: number, y: number): Pt {

@@ -6,6 +6,9 @@ import { debug, expect, open, test } from './fixtures.ts';
 
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
+/** The formula and the file buttons are folded away until asked for (DECISIONS.md D45). */
+const openExports = (page: Page) => page.locator('#export-title').click();
+
 /** The clipboard's text, with Windows' CRLF line ends turned back into LF. */
 const clipboard = async (page: Page) => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
 
@@ -17,6 +20,7 @@ async function downloadOf(page: Page, button: string): Promise<string> {
 test('Desmos text draws what the page draws, plain and with a slider', async ({ page }) => {
   await open(page, 'gen=creature&seed=42&play=0&M=20');
   const d = await debug(page);
+  await openExports(page);
   await page.locator('#copy-desmos').click();
   await expect(page.locator('#toast')).toHaveText('已複製，可以直接貼上。');
   const plain = await clipboard(page);
@@ -33,6 +37,7 @@ test('Desmos text draws what the page draws, plain and with a slider', async ({ 
 
 test('LaTeX lists c_0 and M terms', async ({ page }) => {
   await open(page, 'gen=star&seed=3&play=0&M=12');
+  await openExports(page);
   await page.locator('#copy-latex').click();
   const latex = await clipboard(page);
   expect(latex.startsWith('z(t)=(')).toBe(true);
@@ -43,6 +48,7 @@ test('LaTeX lists c_0 and M terms', async ({ page }) => {
 
 test('coefficients JSON has all N terms and the ones in use', async ({ page }) => {
   await open(page, 'gen=scribble&seed=9&play=0&M=30');
+  await openExports(page);
   const file = JSON.parse(await downloadOf(page, '#download-json'));
   const d = await debug(page);
   expect(file.N).toBe(1024);
@@ -53,6 +59,7 @@ test('coefficients JSON has all N terms and the ones in use', async ({ page }) =
 
 test('SVG is one path, sized in millimetres', async ({ page }) => {
   await open(page, 'gen=star&seed=11&play=0');
+  await openExports(page);
   await page.locator('#svg-width').fill('80');
   const svg = await downloadOf(page, '#download-svg');
   expect(svg).toMatch(/width="80\.0000mm"/);
@@ -65,7 +72,9 @@ test('a saved project opens again exactly as it was', async ({ page }) => {
   await open(page, 'gen=scribble&seed=12345&play=0');
   await page.locator('#m-number').fill('77');
   await page.locator('#m-number').press('Enter');
+  await page.locator('#advanced-title').click();
   await page.getByText('依頻率', { exact: true }).click();
+  await openExports(page);
   const before = await debug(page);
   const text = await downloadOf(page, '#project-save');
   const project = JSON.parse(text);
@@ -84,6 +93,7 @@ test('a saved project opens again exactly as it was', async ({ page }) => {
 
 test('files that cannot be used are refused with a reason', async ({ page }) => {
   await open(page);
+  await openExports(page);
   const offer = async (name: string, text: string) => {
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#project-open').click()]);
     await chooser.setFiles({ name, mimeType: 'application/json', buffer: Buffer.from(text) });

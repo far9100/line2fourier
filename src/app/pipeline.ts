@@ -8,7 +8,7 @@ import {
 import { generate } from '../core/generators.ts';
 import {
   CLOSURE, FILL, JUMP, buildPath, kindSpans, prepareStrokes, samplePath, strokesBBox,
-  type PathResult, type Samples, type Stroke,
+  type BBox, type PathResult, type Samples, type Stroke,
 } from '../core/path.ts';
 import type { SourceSpec } from './state.ts';
 
@@ -22,6 +22,8 @@ export interface Computed {
   spans: Spans;
   /** The drawing's size: the long side of its bounding box. Errors are shown relative to it (DECISIONS.md D11). */
   size: number;
+  /** Its bounding box, which the view is fitted to (DECISIONS.md D45). */
+  box: BBox;
   /** Jump length / path length (spec §4.6). */
   jumpRatio: number;
   samples: Samples;
@@ -31,8 +33,6 @@ export interface Computed {
   N: number;
   approx: Pt[];
   metrics: Metrics;
-  /** The largest circle among the M in use. */
-  largest: Term | null;
 }
 
 export function strokesFor(source: SourceSpec): Stroke[] {
@@ -67,6 +67,7 @@ export function createPipeline() {
       path: p,
       spans: { jump: kindSpans(p, JUMP), closure: kindSpans(p, CLOSURE), fill: kindSpans(p, FILL) },
       size: Math.max(b.maxX - b.minX, b.maxY - b.minY),
+      box: b,
     };
   }, counter('path'));
   const samples = memo((p: PathResult, N: number) => samplePath(p, N), counter('samples'));
@@ -90,11 +91,9 @@ export function createPipeline() {
       const M = Math.min(state.M, o.terms.length);
       const a = approx(o, M, state.N);
       const m = measure(sm, a, o, M);
-      let largest: Term | null = null;
-      for (let j = 0; j < M; j++) if (!largest || o.terms[j].amp > largest.amp) largest = o.terms[j];
       return {
-        strokes: st, path: p.path, spans: p.spans, size: p.size, jumpRatio: p.path.lengths[JUMP] / p.path.total,
-        samples: sm, spectrum: sp, ordered: o, M, N: state.N, approx: a, metrics: m, largest,
+        strokes: st, path: p.path, spans: p.spans, size: p.size, box: p.box, jumpRatio: p.path.lengths[JUMP] / p.path.total,
+        samples: sm, spectrum: sp, ordered: o, M, N: state.N, approx: a, metrics: m,
       };
     },
   };

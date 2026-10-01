@@ -13,7 +13,7 @@ async function download(page: Page, button: string, timeout = 60_000): Promise<{
 test('the video is one cycle long and plays', async ({ page }) => {
   test.setTimeout(120_000);
   await open(page, 'gen=star&seed=3&play=0&M=30');
-  await page.locator('#outputs-title').scrollIntoViewIfNeeded();
+  await page.locator('#outputs-title').click(); // folded away until asked for
   const { name, bytes } = await download(page, '#video-export', 110_000);
   expect(name).toMatch(/^line2fourier\.(mp4|webm)$/);
   await expect(page.locator('#toast')).toContainText('長度剛好一輪');
@@ -47,7 +47,7 @@ test('the video is one cycle long and plays', async ({ page }) => {
 
 test('the WAV leaves out what cannot be played and peaks at 0.9; playing draws the XY figure', async ({ page }) => {
   await open(page, 'gen=creature&seed=8&play=0&M=1000');
-  await page.locator('#outputs-title').scrollIntoViewIfNeeded();
+  await page.locator('#outputs-title').click(); // folded away until asked for
   await expect(page.locator('#scope-note')).toContainText('已捨棄');
   const { name, bytes } = await download(page, '#wav-export');
   expect(name).toBe('line2fourier-100Hz.wav');
@@ -64,21 +64,21 @@ test('the WAV leaves out what cannot be played and peaks at 0.9; playing draws t
   await page.locator('#audio-toggle').click();
   await expect(page.locator('#audio-toggle')).toHaveAttribute('aria-pressed', 'true');
   await page.waitForTimeout(400);
-  const brass = await page.evaluate(() => {
+  const traced = await page.evaluate(() => {
     const c = document.querySelector('#xy') as HTMLCanvasElement;
     const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
     let n = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i + 2] - d[i] < -18) n++;
+    for (let i = 0; i < d.length; i += 4) if (Math.max(d[i], d[i + 1], d[i + 2]) < 110) n++; // the black trace
     return n;
   });
-  expect(brass).toBeGreaterThan(100);
+  expect(traced).toBeGreaterThan(100);
   await page.locator('#audio-toggle').click();
   await expect(page.locator('#audio-toggle')).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('the flipbook is a 4-page A4 PDF', async ({ page }) => {
   await open(page, 'gen=scribble&seed=5&play=0&M=40');
-  await page.locator('#outputs-title').scrollIntoViewIfNeeded();
+  await page.locator('#outputs-title').click(); // folded away until asked for
   const { name, bytes } = await download(page, '#flipbook-export');
   expect(name).toBe('line2fourier-flipbook.pdf');
   const { PDFDocument } = await import('pdf-lib');

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coefficients, orderTerms, partialCurve, type Pt } from '../../src/core/fourier.ts';
 import { CLOSURE, FILL, INK, JUMP, buildPath, kindSpans, samplePath, type Stroke } from '../../src/core/path.ts';
-import { makeCamera, toScreen, toWorld } from '../../src/render/camera.ts';
+import { FIT_MARGIN, cameraFor, fitScale, toScreen, toWorld, zoomAbout } from '../../src/render/camera.ts';
 import { curveEvents, kindAt, tipAt, traceCurve, type PathSink } from '../../src/render/curve.ts';
 
 /** Records drawing calls as polylines. */
@@ -120,9 +120,11 @@ describe('tracing the curve', () => {
   });
 });
 
-describe('camera', () => {
+describe('camera (DECISIONS.md D45)', () => {
+  const unit = { minX: -1, minY: -1, maxX: 1, maxY: 1 };
+
   it('maps world to screen and back, with y up in the world', () => {
-    const cam = makeCamera(800, 600);
+    const cam = cameraFor(800, 600, unit);
     expect(toScreen(cam, 0, 0)).toEqual([400, 300]);
     const [x, y] = toScreen(cam, 1, 1);
     expect(x).toBeGreaterThan(400);
@@ -132,13 +134,31 @@ describe('camera', () => {
     expect(back[1]).toBeCloseTo(1, 12);
   });
 
-  it('has a fixed scale: [-1.35, 1.35] fits the shorter side, whatever is drawn', () => {
-    expect(makeCamera(800, 600).s).toBeCloseTo(300 / 1.35, 12);
+  it('fits the drawing: a tall one fills the height, a wide one the width, with a small margin', () => {
+    const tall = { minX: 2, minY: 0, maxX: 3, maxY: 4 }, wide = { minX: 0, minY: 0, maxX: 8, maxY: 1 };
+    expect(fitScale(800, 600, tall)).toBeCloseTo(600 / (4 * (1 + 2 * FIT_MARGIN)), 12);
+    expect(fitScale(800, 600, wide)).toBeCloseTo(800 / (8 * (1 + 2 * FIT_MARGIN)), 12);
+    const cam = cameraFor(800, 600, tall);
+    expect(toScreen(cam, 2.5, 2)).toEqual([400, 300]); // the box's centre in the middle
+    const [, top] = toScreen(cam, 2.5, 4), [, bottom] = toScreen(cam, 2.5, 0);
+    expect(top).toBeGreaterThan(0);
+    expect(bottom).toBeLessThan(600);
+    expect(bottom - top).toBeGreaterThan(0.9 * 600);
+  });
+
+  it('zooming about a point keeps that point where it is', () => {
+    const cam = cameraFor(800, 600, unit);
+    const before = toWorld(cam, 650, 120);
+    const z = zoomAbout(cam, 3, 650, 120);
+    expect(z.s).toBeCloseTo(3 * cam.s, 12);
+    const after = toWorld(z, 650, 120);
+    expect(after[0]).toBeCloseTo(before[0], 12);
+    expect(after[1]).toBeCloseTo(before[1], 12);
   });
 
   it('following puts the pen in the middle, magnified', () => {
-    const cam = makeCamera(800, 600, [0.3, -0.2], 10);
+    const cam = cameraFor(800, 600, unit, 10, [0.3, -0.2]);
     expect(toScreen(cam, 0.3, -0.2)).toEqual([400, 300]);
-    expect(cam.s).toBeCloseTo((10 * 300) / 1.35, 9);
+    expect(cam.s).toBeCloseTo(10 * fitScale(800, 600, unit), 9);
   });
 });

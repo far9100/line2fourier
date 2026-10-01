@@ -45,11 +45,11 @@ describe('pipeline: only what changed is recomputed', () => {
     expect(p.calls).toEqual(before);
   });
 
-  it('reports the jump ratio, the drawing size and the largest circle in use', () => {
+  it('reports the jump ratio, the drawing size and the box the view is fitted to', () => {
     const c = createPipeline().compute(base());
     expect(c.jumpRatio).toBe(0);
     expect(c.size).toBeCloseTo(2, 12);
-    expect(c.largest).toBe(c.ordered.terms[0]);
+    expect(Math.max(c.box.maxX - c.box.minX, c.box.maxY - c.box.minY)).toBeCloseTo(c.size, 12);
     expect(c.approx).toHaveLength(1024);
   });
 
