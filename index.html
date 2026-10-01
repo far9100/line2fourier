@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-TW" class="i18n-pending">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Turn a line drawing into a chain of turning circles: its Fourier series, drawn live in your browser.">
+  <title>line2fourier</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <script type="module" src="./src/main.ts"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1 class="brand-name">line2fourier</h1>
+      <p class="brand-tag" data-i18n="app.tagline">Draw a line with a chain of turning circles</p>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="quiet" id="about-open" data-i18n="about.open">How it works</button>
+      <div class="lang" role="group" aria-label="Language" data-i18n-aria-label="lang.group">
+        <button type="button" data-lang="zh-TW" lang="zh-TW">中文</button>
+        <button type="button" data-lang="en" lang="en">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage" aria-labelledby="stage-title">
+      <h2 id="stage-title" class="visually-hidden" data-i18n="stage.title">The drawing</h2>
+      <div class="bar" role="toolbar" aria-label="Drawing controls" data-i18n-aria-label="bar.label">
+        <div class="joined">
+          <button type="button" id="new-drawing" class="primary" data-i18n="ctrl.newDrawing">New drawing</button>
+          <label class="visually-hidden" for="generator" data-i18n="ctrl.generator">Kind of drawing</label>
+          <select id="generator">
+            <option value="creature" data-i18n="gen.creature">Creature</option>
+            <option value="scribble" data-i18n="gen.scribble">Scribble</option>
+            <option value="star" data-i18n="gen.star">Spiky star</option>
+          </select>
+        </div>
+        <button type="button" id="draw" data-i18n="ctrl.draw">Draw your own</button>
+        <button type="button" id="demo" aria-pressed="false" data-i18n="ctrl.demo">Show convergence</button>
+        <button type="button" id="play" class="play" aria-pressed="false"><span id="play-label" data-i18n="ctrl.play">Play</span></button>
+      </div>
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="view" role="img" aria-label="Epicycles drawing the line" data-i18n-aria-label="canvas.label"></canvas>
+        <div class="draw-overlay" id="draw-overlay" hidden>
+          <p data-i18n="draw.hint">Press and drag to draw one line; let go to finish.</p>
+          <button type="button" id="draw-cancel" data-i18n="draw.cancel">Cancel</button>
+        </div>
+      </div>
+      <p class="status" id="status"></p>
+    </section>
+
+    <aside class="panel">
+      <section class="card" aria-labelledby="circles-title">
+        <h2 id="circles-title" data-i18n="panel.circles">Circles</h2>
+        <div class="field">
+          <div class="field-head">
+            <label for="m-range" data-i18n="m.label">Number of circles</label>
+            <input type="number" id="m-number" min="1" step="1" inputmode="numeric" aria-label="Number of circles" data-i18n-aria-label="m.label">
+          </div>
+          <input type="range" id="m-range" min="0" step="1">
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="speed" data-i18n="speed.label">Speed</label>
+            <output id="speed-out" for="speed"></output>
+          </div>
+          <input type="range" id="speed" min="0" step="1">
+        </div>
+        <fieldset class="field">
+          <legend data-i18n="order.label">Order of the circles</legend>
+          <div class="segmented">
+            <label><input type="radio" name="order" value="magnitude"><span data-i18n="order.magnitude">By size</span></label>
+            <label><input type="radio" name="order" value="frequency"><span data-i18n="order.frequency">By frequency</span></label>
+          </div>
+        </fieldset>
+        <div class="field checks">
+          <label><input type="checkbox" id="show-circles"><span data-i18n="view.circles">Show circles</span></label>
+          <label><input type="checkbox" id="show-original"><span data-i18n="view.original">Show the original</span></label>
+        </div>
+        <details class="advanced">
+          <summary data-i18n="advanced">More settings</summary>
+          <div class="field">
+            <label for="n-select" data-i18n="n.label">Sample points N</label>
+            <select id="n-select"></select>
+          </div>
+          <div class="field">
+            <label for="seed" data-i18n="seed.label">Seed</label>
+            <div class="row">
+              <input type="text" id="seed" inputmode="numeric" autocomplete="off" spellcheck="false">
+              <button type="button" id="seed-apply" data-i18n="seed.apply">Draw it</button>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="card" aria-labelledby="metrics-title">
+        <h2 id="metrics-title" data-i18n="metrics.title">How close</h2>
+        <dl class="metrics">
+          <div><dt data-i18n="metrics.energy">Energy captured</dt><dd id="metric-energy"></dd></div>
+          <div><dt data-i18n="metrics.rms">RMS error</dt><dd id="metric-rms"></dd></div>
+          <div><dt data-i18n="metrics.mean">Mean deviation</dt><dd id="metric-mean"></dd></div>
+          <div><dt data-i18n="metrics.largest">Largest circle</dt><dd id="metric-largest"></dd></div>
+        </dl>
+        <p class="note" data-i18n="metrics.note">Errors are shares of the drawing's size. More circles, closer fit.</p>
+      </section>
+
+      <section class="card" aria-labelledby="formula-title">
+        <h2 id="formula-title" data-i18n="formula.title">The series</h2>
+        <div class="formula" id="formula" aria-live="off"></div>
+        <p class="note" id="formula-count"></p>
+        <div class="buttons">
+          <button type="button" id="copy-desmos" data-i18n="copy.desmos">Copy for Desmos</button>
+          <button type="button" id="copy-desmos-slider" data-i18n="copy.desmosSlider">Desmos, with an M slider</button>
+          <button type="button" id="copy-latex" data-i18n="copy.latex">Copy LaTeX</button>
+        </div>
+        <p class="note" id="desmos-note" hidden></p>
+      </section>
+
+      <section class="card" aria-labelledby="export-title">
+        <h2 id="export-title" data-i18n="export.title">Save</h2>
+        <div class="buttons">
+          <button type="button" id="download-json" data-i18n="export.json">Coefficients (JSON)</button>
+        </div>
+        <div class="svg-row">
+          <label><span data-i18n="export.svgWidth">Width (mm)</span><input type="number" id="svg-width" min="10" max="3000" step="1" value="150"></label>
+          <label><span data-i18n="export.svgStroke">Line (mm)</span><input type="number" id="svg-stroke" min="0.05" max="10" step="0.05" value="0.3"></label>
+          <button type="button" id="download-svg" data-i18n="export.svg">Download SVG</button>
+        </div>
+        <div class="buttons">
+          <button type="button" id="project-save" data-i18n="project.save">Save project</button>
+          <button type="button" id="project-open" data-i18n="project.open">Open project</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="foot">
+    <p data-i18n="footer.privacy">Everything runs in your browser: nothing you draw or open is uploaded.</p>
+    <p data-i18n="footer.license">Free software under the GNU GPL v3 or later.</p>
+  </footer>
+
+  <dialog id="about" aria-labelledby="about-title">
+    <h2 id="about-title" data-i18n="about.title">How this is drawn</h2>
+    <p data-i18n="about.p1"></p>
+    <p data-i18n="about.p2"></p>
+    <p data-i18n="about.p3"></p>
+    <p data-i18n="about.p4"></p>
+    <h3 data-i18n="about.keysTitle">Keys</h3>
+    <p data-i18n="about.keys"></p>
+    <div class="dialog-actions"><button type="button" id="about-close" data-i18n="about.close">Close</button></div>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <input type="file" id="file-input" accept=".json,application/json" hidden>
+</body>
+</html>

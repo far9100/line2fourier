@@ -8,7 +8,8 @@ export function parseDesmos(text: string): (t: number) => Pt {
   const lists = new Map<string, number[]>();
   const scalars = new Map<string, number>();
   let curve = '';
-  for (const line of text.trim().split('\n')) {
+  // Windows clipboards hand text back with CRLF line ends.
+  for (const line of text.trim().split(/\r?\n/)) {
     let m: RegExpMatchArray | null;
     if ((m = line.match(/^([A-Z])=\[([^\]]*)\]$/))) lists.set(m[1], m[2] === '' ? [] : m[2].split(',').map(Number));
     else if ((m = line.match(/^([A-Z])=(-?\d+(?:\.\d+)?)$/))) scalars.set(m[1], Number(m[2]));
