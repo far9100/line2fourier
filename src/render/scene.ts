@@ -6,7 +6,7 @@
 // except the pen that paints areas, which is as wide as the drawing says (D42).
 import type { Computed } from '../app/pipeline.ts';
 import { chainInto, type Pt } from '../core/fourier.ts';
-import { CLOSURE, FILL, JUMP } from '../core/path.ts';
+import { AGAIN, CLOSURE, FILL, JUMP } from '../core/path.ts';
 import type { Camera } from './camera.ts';
 import { kindAt, traceCurve, type CurveEvents } from './curve.ts';
 import type { Style } from './theme.ts';
@@ -32,7 +32,7 @@ export function buildScene(computed: Computed, events: CurveEvents): Scene {
   const n = poly.length;
   for (let i = 0; i < n; i++) {
     const kind = kinds[i];
-    if (kind === JUMP) continue;
+    if (kind === JUMP || kind === AGAIN) continue; // not drawn: a pen-up move, or a line that is there already
     const target = kind === CLOSURE ? originalClosure : kind === FILL ? originalFill : originalInk;
     const a = poly[i], b = poly[(i + 1) % n];
     if (i === 0 || kinds[i - 1] !== kind) target.moveTo(a[0], a[1]);

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { resampleClosed, type Pt } from '../../src/core/fourier.ts';
 import {
-  CLOSURE, FILL, INK, JUMP, PathError, buildPath, cleanStroke, kindSpans, normalizeToUnit, orientedPoints,
-  prepareStrokes, samplePath, strokesBBox, type Stroke,
+  AGAIN, CLOSURE, FILL, INK, JUMP, PathError, buildPath, cleanStroke, kindSpans, normalizeToUnit, orientedPoints,
+  prepareStrokes, samplePath, spansOf, strokesBBox, type Stroke,
 } from '../../src/core/path.ts';
 
 const square: Stroke = { pts: [[0, 0], [1, 0], [1, 1], [0, 1]], closed: true };
@@ -53,8 +53,24 @@ describe('building the closed path (spec §4.6)', () => {
     expect(p.poly).toEqual(square.pts);
     expect(Array.from(p.kinds)).toEqual([INK, INK, INK, INK]);
     expect(p.total).toBe(4);
-    expect(p.lengths).toEqual([4, 0, 0, 0]);
+    expect(p.lengths).toEqual([4, 0, 0, 0, 0]);
     expect(p.fillWidth).toBe(0);
+  });
+
+  it('a stretch walked along again is its own kind, touches what it follows without a jump, and paints nothing (D46)', () => {
+    const back: Stroke = { pts: [[2, 0], [1, 2], [0, 0]], closed: false, again: true };
+    const p = buildPath([vee, back]);
+    expect(p.poly).toEqual([[0, 0], [1, 2], [2, 0], [1, 2]]);
+    expect(Array.from(p.kinds)).toEqual([INK, INK, AGAIN, AGAIN]); // the walk ends where it began: no jump, no closing line
+    expect(p.lengths[AGAIN]).toBeCloseTo(p.lengths[INK], 12);
+    expect(p.lengths[JUMP]).toBe(0);
+    expect(spansOf(p)).toEqual({ jump: [], closure: [], fill: [], again: [[0.5, 1]] });
+    // A painted stroke walked again keeps its flag through cleaning and scaling, and its pen is not counted.
+    const painted: Stroke = { pts: [[0, 0], [1, 0], [1, 0], [1, 1]], closed: false, fill: 0.5, again: true };
+    expect(cleanStroke(painted)).toEqual({ pts: [[0, 0], [1, 0], [1, 1]], closed: false, fill: 0.5, again: true });
+    expect(normalizeToUnit([painted])[0]).toMatchObject({ fill: 1, again: true });
+    expect(buildPath([vee, cleanStroke(painted)]).fillWidth).toBe(0);
+    expect(cleanStroke(vee)).toEqual(vee); // and a plain stroke gets no flag
   });
 
   it('a single open stroke is closed by a straight closure segment', () => {

@@ -57,7 +57,7 @@ export interface Debug {
   highlight: { x: number; y: number; r: number; j: number } | null;
   tipScreen: [number, number] | null;
   calls: Record<string, number>;
-  timings: { recompute: number; render: number };
+  timings: { recompute: number; scene: number; render: number };
 }
 
 export function debug(page: Page): Promise<Debug> {

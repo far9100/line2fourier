@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chainAt, coefficients, orderTerms, partialCurve, resampleClosed, type Pt, type Term } from '../../src/core/fourier.ts';
 import { generate } from '../../src/core/generators.ts';
-import { CLOSURE, FILL, JUMP, buildPath, kindSpans, prepareStrokes, samplePath } from '../../src/core/path.ts';
+import { buildPath, prepareStrokes, samplePath, spansOf } from '../../src/core/path.ts';
 import { SLIDER_MIN_TERMS, toDesmos, toDesmosSlider } from '../../src/export/desmos.ts';
 import { toCoefficientsJson, type CoefficientsFile } from '../../src/export/json.ts';
 import { toLatex, toLatexPreview } from '../../src/export/latex.ts';
@@ -123,7 +123,7 @@ describe('coefficients JSON (spec §8)', () => {
 describe('SVG (spec §8)', () => {
   function svgFor(strokes: Parameters<typeof buildPath>[0], M: number, widthMm = 120) {
     const path = buildPath(prepareStrokes(strokes));
-    const spans = { jump: kindSpans(path, JUMP), closure: kindSpans(path, CLOSURE), fill: kindSpans(path, FILL) };
+    const spans = spansOf(path);
     const s = samplePath(path, N);
     const o = orderTerms(coefficients(s.pts));
     const approx = partialCurve(o.c0, o.terms, M, N);

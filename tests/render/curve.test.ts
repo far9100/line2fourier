@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { coefficients, orderTerms, partialCurve, type Pt } from '../../src/core/fourier.ts';
-import { CLOSURE, FILL, INK, JUMP, buildPath, kindSpans, samplePath, type Stroke } from '../../src/core/path.ts';
+import { AGAIN, FILL, INK, JUMP, buildPath, samplePath, spansOf, type Stroke } from '../../src/core/path.ts';
 import { FIT_MARGIN, cameraFor, fitScale, toScreen, toWorld, zoomAbout } from '../../src/render/camera.ts';
-import { curveEvents, kindAt, tipAt, traceCurve, type PathSink } from '../../src/render/curve.ts';
+import { curveEvents, kindAt, tipAt, tipSampler, traceCurve, type PathSink } from '../../src/render/curve.ts';
 
 /** Records drawing calls as polylines. */
 function recorder() {
@@ -19,7 +19,7 @@ const strokes: Stroke[] = [
   { pts: [[3, 0], [4, 1]], closed: false },
 ];
 const path = buildPath(strokes);
-const spans = { jump: kindSpans(path, JUMP), closure: kindSpans(path, CLOSURE), fill: kindSpans(path, FILL) };
+const spans = spansOf(path);
 const N = 256;
 const s = samplePath(path, N);
 const o = orderTerms(coefficients(s.pts));
@@ -42,6 +42,22 @@ describe('curve events', () => {
     expect(kindAt(spans, (spans.jump[0][0] + spans.jump[0][1]) / 2)).toBe(JUMP);
   });
 
+  it('the tip read off a denser curve agrees with the summed one far more closely than a line is wide (D47)', () => {
+    // An opened drawing is sampled at least 1024 times; the worst case is every circle in use.
+    const n = 1024, sm = samplePath(path, n), oo = orderTerms(coefficients(sm.pts));
+    for (const [m, tolerance] of [[100, 5e-5], [n - 1, 5e-4]] as const) {
+      const at = tipSampler(oo.c0, oo.terms, m, n);
+      let worst = 0;
+      for (let i = 0; i < 997; i++) {
+        const t = i / 997, p = at(t), q = tipAt(oo.c0, oo.terms, m, t);
+        worst = Math.max(worst, Math.hypot(p[0] - q[0], p[1] - q[1]));
+      }
+      expect(worst).toBeLessThan(tolerance); // the drawing is 4 across
+      expect(at(1)).toEqual(at(0));
+      expect(at(0)).toEqual(partialCurve(oo.c0, oo.terms, m, n)[0]);
+    }
+  });
+
   it('with all N − 1 circles, the edges of the strokes are on the drawing', () => {
     // The approximation interpolates the samples; at a stroke's end it is close to the end point.
     const [a] = spans.jump[0];
@@ -60,7 +76,7 @@ describe('tracing the curve', () => {
 
   it('a single open stroke has its closing line traced separately', () => {
     const p = buildPath([{ pts: [[0, 0], [2, 0], [1, 1.5]], closed: false }]);
-    const sp = { jump: kindSpans(p, JUMP), closure: kindSpans(p, CLOSURE), fill: kindSpans(p, FILL) };
+    const sp = spansOf(p);
     const sm = samplePath(p, 128);
     const oo = orderTerms(coefficients(sm.pts));
     const e = curveEvents(partialCurve(oo.c0, oo.terms, 20, 128), sp, t => tipAt(oo.c0, oo.terms, 20, t));
@@ -77,7 +93,7 @@ describe('tracing the curve', () => {
       { pts: [[0, 0], [2, 0], [2, 2]], closed: false },
       { pts: [[3, 0], [4, 0], [4, 1], [3, 1]], closed: true, fill: 0.25 },
     ]);
-    const sp = { jump: kindSpans(p, JUMP), closure: kindSpans(p, CLOSURE), fill: kindSpans(p, FILL) };
+    const sp = spansOf(p);
     expect(sp.fill).toHaveLength(1);
     const sm = samplePath(p, 256);
     const oo = orderTerms(coefficients(sm.pts));
@@ -89,6 +105,36 @@ describe('tracing the curve', () => {
     expect(ink.lines).toHaveLength(1);
     expect(fill.lines).toHaveLength(1);
     for (const [x] of fill.lines[0]) expect(x).toBeGreaterThan(2.5);
+  });
+
+  it('a line the pen walks along again is drawn once: no sink gets the second pass (D46)', () => {
+    // An L, then the same L walked back to its start.
+    const p = buildPath([
+      { pts: [[0, 0], [2, 0], [2, 1]], closed: false },
+      { pts: [[2, 1], [2, 0], [0, 0]], closed: false, again: true },
+    ]);
+    expect(Array.from(p.kinds)).toEqual([INK, INK, AGAIN, AGAIN]);
+    const sp = spansOf(p);
+    expect(sp.jump).toHaveLength(0);
+    expect(sp.again).toHaveLength(1);
+    expect(sp.again[0][0]).toBeCloseTo(0.5, 12);
+    expect(sp.again[0][1]).toBe(1);
+    expect(kindAt(sp, 0.25)).toBe(INK);
+    expect(kindAt(sp, 0.75)).toBe(AGAIN);
+    const sm = samplePath(p, 256);
+    const oo = orderTerms(coefficients(sm.pts));
+    const e = curveEvents(partialCurve(oo.c0, oo.terms, 255, 256), sp, t => tipAt(oo.c0, oo.terms, 255, t));
+    for (let i = 0; i + 1 < e.count; i++) expect(e.kind[i]).toBe(e.t[i] < 0.5 ? INK : AGAIN);
+    const ink = recorder(), closure = recorder(), fill = recorder(), jump = recorder();
+    traceCurve(e, 1, null, ink.sink, closure.sink, fill.sink, jump.sink);
+    expect(ink.lines).toHaveLength(1);
+    expect([closure.lines, fill.lines, jump.lines]).toEqual([[], [], []]);
+    const end = ink.lines[0][ink.lines[0].length - 1];
+    expect(Math.hypot(end[0] - 2, end[1] - 1)).toBeLessThan(0.02); // the one line stops at the far end of the L
+    // Half way back the trail is still that one line: nothing is added on the way.
+    const back = recorder();
+    traceCurve(e, 0.8, tipAt(oo.c0, oo.terms, 255, 0.8), back.sink, back.sink, back.sink, back.sink);
+    expect(back.lines).toEqual(ink.lines);
   });
 
   it('with a sink for them, the jumps are traced too, each joining the end of one stroke to the start of the next (D44)', () => {

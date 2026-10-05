@@ -19,7 +19,7 @@ import { toLatex, toLatexPreview } from './export/latex.ts';
 import { toSvg } from './export/svg.ts';
 import { detectLang, setLang, t, type Lang } from './i18n/index.ts';
 import { CanvasView } from './render/canvasView.ts';
-import { curveEvents, tipAt } from './render/curve.ts';
+import { curveEvents, tipAt, tipSampler } from './render/curve.ts';
 import { buildScene } from './render/scene.ts';
 import { SpectrumView, autoRange } from './render/spectrumView.ts';
 import { formatShare } from './ui/format.ts';
@@ -81,8 +81,20 @@ let firstCycleDone = reducedMotion;
 let draft: Pt[] | null = null;
 let dirty = true;
 let lastFrame = performance.now();
-/** Milliseconds: the last pipeline run, and a running average of drawing one frame (spec §6). */
-const timings = { recompute: 0, render: 0 };
+/** Milliseconds: the last pipeline run, building what is drawn from it, and a running average of drawing one frame (spec §6). */
+const timings = { recompute: 0, scene: 0, render: 0 };
+
+/** Above this many span edges × circles, the edges are read off a denser curve instead of summed one by one (DECISIONS.md D47). */
+const EXACT_EDGE_WORK = 100_000;
+
+/** Where the curve is at the edge of a span: the series summed there, or, for many edges, a curve sampled densely once. */
+function edgeTip(c: Computed, N = c.N): (t: number) => Pt {
+  const { c0, terms } = c.ordered, M = c.M;
+  const edges = 2 * (c.spans.jump.length + c.spans.closure.length + c.spans.fill.length + c.spans.again.length);
+  if (edges * M > EXACT_EDGE_WORK) return tipSampler(c0, terms, M, N);
+  const scratch = new Float64Array(2 * M + 2);
+  return t => tipAt(c0, terms, M, t, scratch);
+}
 
 /** Run the pipeline; on a drawing that cannot be used, say why and keep the previous one. */
 function recompute(s: AppState): boolean {
@@ -103,9 +115,9 @@ function recompute(s: AppState): boolean {
   if (!computed || next.strokes !== computed.strokes) view.fitTo(next.box);
   computed = next;
   if (changed) {
-    const { c0, terms } = next.ordered;
-    const scratch = new Float64Array(2 * next.M + 2);
-    view.scene = buildScene(next, curveEvents(next.approx, next.spans, tt => tipAt(c0, terms, next.M, tt, scratch), next.path.fillWidth));
+    const built = performance.now();
+    view.scene = buildScene(next, curveEvents(next.approx, next.spans, edgeTip(next), next.path.fillWidth));
+    timings.scene = performance.now() - built;
   }
   dirty = true;
   return true;
@@ -418,8 +430,7 @@ $('#download-svg').addEventListener('click', () => {
   // Sample the curve 8192 times (exact trigonometric interpolation), smoother than N points.
   const { c0, terms, M } = currentTerms();
   const fine = partialCurve(c0, terms, M, Math.max(computed.N, 8192));
-  const scratch = new Float64Array(2 * M + 2);
-  const events = curveEvents(fine, computed.spans, tt => tipAt(c0, terms, M, tt, scratch), computed.path.fillWidth);
+  const events = curveEvents(fine, computed.spans, edgeTip(computed, fine.length), computed.path.fillWidth);
   downloadText(toSvg(events, { widthMm, strokeMm }), 'line2fourier.svg', 'image/svg+xml');
 });
 $('#project-save').addEventListener('click', () => {

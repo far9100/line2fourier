@@ -7,14 +7,12 @@ import {
 } from '../core/fourier.ts';
 import { generate } from '../core/generators.ts';
 import {
-  CLOSURE, FILL, JUMP, buildPath, kindSpans, prepareStrokes, samplePath, strokesBBox,
-  type BBox, type PathResult, type Samples, type Stroke,
+  JUMP, buildPath, prepareStrokes, samplePath, spansOf, strokesBBox,
+  type BBox, type PathResult, type Samples, type Spans, type Stroke,
 } from '../core/path.ts';
 import type { SourceSpec } from './state.ts';
 
 export interface Ordered { c0: Term; terms: Term[]; energy: EnergyTable }
-
-export interface Spans { jump: [number, number][]; closure: [number, number][]; fill: [number, number][] }
 
 export interface Computed {
   strokes: Stroke[];
@@ -65,7 +63,7 @@ export function createPipeline() {
     const b = strokesBBox(s);
     return {
       path: p,
-      spans: { jump: kindSpans(p, JUMP), closure: kindSpans(p, CLOSURE), fill: kindSpans(p, FILL) },
+      spans: spansOf(p),
       size: Math.max(b.maxX - b.minX, b.maxY - b.minY),
       box: b,
     };

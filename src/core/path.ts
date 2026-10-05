@@ -1,24 +1,34 @@
 // Strokes → one closed path. Every segment of the path has a kind: ink is drawn, closure is the
 // straight line that closes a single open stroke (drawn dashed in the original), jump is the
-// pen-up move between strokes (computed with the rest, never drawn), and fill paints an area with
-// a pen as wide as the stroke says (DECISIONS.md D42). Spec §4.1, §4.6, §13.
+// pen-up move between strokes (computed with the rest, never drawn), fill paints an area with
+// a pen as wide as the stroke says (DECISIONS.md D42), and again is a line the pen has drawn
+// already and walks along once more on its way somewhere else: the pen stays down and nothing is
+// drawn a second time (D46). Spec §4.1, §4.6, §13.
 import { resampleClosedIndexed, type Pt } from './fourier.ts';
 
 export const INK = 0;
 export const CLOSURE = 1;
 export const JUMP = 2;
 export const FILL = 3;
-export type SegKind = typeof INK | typeof CLOSURE | typeof JUMP | typeof FILL;
+export const AGAIN = 4;
+export type SegKind = typeof INK | typeof CLOSURE | typeof JUMP | typeof FILL | typeof AGAIN;
 
 export interface Stroke {
   pts: Pt[];
   closed: boolean;
   /** Set on a stroke that paints an area: the width of its pen, in the stroke's own units. */
   fill?: number;
+  /** Set on a stretch that is walked along again: it was drawn the first time (D46). */
+  again?: true;
 }
 
 /** A copy of `s` with other points, keeping what kind of stroke it is. */
-export const withPts = (s: Stroke, pts: Pt[], closed = s.closed): Stroke => (s.fill ? { pts, closed, fill: s.fill } : { pts, closed });
+export function withPts(s: Stroke, pts: Pt[], closed = s.closed): Stroke {
+  const out: Stroke = { pts, closed };
+  if (s.fill) out.fill = s.fill;
+  if (s.again) out.again = true;
+  return out;
+}
 
 /** How one stroke is walked in a path: its index, its direction, and (closed strokes only) the vertex it starts at. */
 export interface TourStep { index: number; reversed: boolean; start: number }
@@ -32,7 +42,7 @@ export interface PathResult {
   cum: Float64Array;
   total: number;
   /** Total length of each kind of segment, indexed by SegKind. */
-  lengths: [number, number, number, number];
+  lengths: [number, number, number, number, number];
   /** The width of the pen that paints areas (the widest of the strokes'), 0 when nothing is painted. */
   fillWidth: number;
 }
@@ -99,8 +109,9 @@ export function normalizeToUnit(strokes: Stroke[]): Stroke[] {
   const half = Math.max(b.maxX - b.minX, b.maxY - b.minY) / 2;
   const s = half > 0 ? 1 / half : 1;
   return strokes.map(st => {
-    const pts = st.pts.map(([x, y]) => [(x - cx) * s, (y - cy) * s] as Pt);
-    return st.fill ? { pts, closed: st.closed, fill: st.fill * s } : { pts, closed: st.closed };
+    const out = withPts(st, st.pts.map(([x, y]) => [(x - cx) * s, (y - cy) * s] as Pt));
+    if (st.fill) out.fill = st.fill * s;
+    return out;
   });
 }
 
@@ -134,14 +145,15 @@ export function buildPath(strokes: Stroke[], order: TourStep[] = identityOrder(s
     pts.push(p);
     arrive.push(kind);
   };
+  const kindOf = (s: Stroke): SegKind => (s.again ? AGAIN : s.fill ? FILL : INK);
   let fillWidth = 0;
   for (const step of order) {
-    const stroke = strokes[step.index], kind = stroke.fill ? FILL : INK;
-    if (stroke.fill) fillWidth = Math.max(fillWidth, stroke.fill);
+    const stroke = strokes[step.index], kind = kindOf(stroke);
+    if (kind === FILL) fillWidth = Math.max(fillWidth, stroke.fill!);
     orientedPoints(stroke, step).forEach((p, i) => push(p, i === 0 ? JUMP : kind));
   }
   const only = order.length === 1 ? strokes[order[0].index] : null;
-  let closing: SegKind = only ? (only.closed ? (only.fill ? FILL : INK) : CLOSURE) : JUMP;
+  let closing: SegKind = only ? (only.closed ? kindOf(only) : CLOSURE) : JUMP;
   if (pts.length > 1 && same(pts[pts.length - 1], pts[0])) {
     closing = arrive[arrive.length - 1];
     pts.pop();
@@ -153,7 +165,7 @@ export function buildPath(strokes: Stroke[], order: TourStep[] = identityOrder(s
   kinds[n - 1] = closing;
 
   const cum = new Float64Array(n + 1);
-  const lengths: [number, number, number, number] = [0, 0, 0, 0];
+  const lengths: PathResult['lengths'] = [0, 0, 0, 0, 0];
   for (let i = 0; i < n; i++) {
     const a = pts[i], b = pts[(i + 1) % n];
     const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -180,6 +192,18 @@ export function kindSpans(path: PathResult, kind: SegKind): [number, number][] {
     else out.push([t0, t1]);
   }
   return out;
+}
+
+/** Where the path is not plain ink, as parameter intervals: what the drawing code needs to know. */
+export interface Spans {
+  jump: [number, number][];
+  closure: [number, number][];
+  fill: [number, number][];
+  again: [number, number][];
+}
+
+export function spansOf(path: PathResult): Spans {
+  return { jump: kindSpans(path, JUMP), closure: kindSpans(path, CLOSURE), fill: kindSpans(path, FILL), again: kindSpans(path, AGAIN) };
 }
 
 export interface Samples {
