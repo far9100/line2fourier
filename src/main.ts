@@ -428,7 +428,7 @@ $('#download-svg').addEventListener('click', () => {
     toast(t('export.svgInvalid'), 'error');
     return;
   }
-  // Sample the curve 8192 times (exact trigonometric interpolation), smoother than N points.
+  // Sample the curve at least 8192 times (exact trigonometric interpolation): smoother than N points when N is less.
   const { c0, terms, M } = currentTerms();
   const fine = partialCurve(c0, terms, M, Math.max(computed.N, 8192));
   const events = curveEvents(fine, computed.spans, edgeTip(computed, fine.length), computed.path.fillWidth);
@@ -525,7 +525,7 @@ async function importDrawing(file: Incoming, prepare: () => Promise<Prepared | {
   if (settings) {
     store.set({ source, ...settings, mode: 'play', demo: null, selectedK: null });
   } else {
-    // N for the path's length, then the fewest circles within 0.25% of the drawing's size (DECISIONS.md D28).
+    // N for the path's length, then the fewest circles within 0.08% of the drawing's size (DECISIONS.md D47).
     const N = prepared.N;
     const probe = pipeline.compute({ source, N, M: N - 1, order: store.get().order });
     store.set({ source, N, M: suggestM(probe.ordered.energy.dropped, N), mode: 'play', demo: null, selectedK: null });
