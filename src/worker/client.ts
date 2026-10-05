@@ -1,11 +1,12 @@
 // The page's side of the worker. Without a worker (a browser that refuses module workers), or if
 // it fails, the same handler runs on the main thread: slower, but the same result.
 import type { Stroke } from '../core/path.ts';
-import type { Tour, TourOptions } from '../core/tour.ts';
+import type { Routed } from '../core/route.ts';
 import { handle, pack, unpack, type RasterReply, type Request, type Response } from './protocol.ts';
 
 export interface WorkerClient {
-  tour(strokes: Stroke[], opts?: TourOptions): Promise<Tour>;
+  /** One walk over the strokes; `reach` is the widest gap crossed pen down (core/route.ts). */
+  route(strokes: Stroke[], reach: number): Promise<Routed>;
   raster(rgba: Uint8ClampedArray, width: number, height: number): Promise<Omit<RasterReply, 'strokes'> & { strokes: Stroke[] }>;
 }
 
@@ -47,11 +48,11 @@ export function createWorkerClient(): WorkerClient {
   };
 
   return {
-    async tour(strokes, opts) {
-      const res = await call({ id: nextId++, type: 'tour', strokes: pack(strokes), opts });
+    async route(strokes, reach) {
+      const res = await call({ id: nextId++, type: 'route', strokes: pack(strokes), reach });
       if (!res.ok) throw new Error(res.error);
-      if (!('tour' in res)) throw new Error('unexpected reply');
-      return res.tour;
+      if (!('route' in res)) throw new Error('unexpected reply');
+      return { ...res.route, strokes: unpack(res.route.strokes) };
     },
     async raster(rgba, width, height) {
       const res = await call({ id: nextId++, type: 'raster', rgba, width, height });

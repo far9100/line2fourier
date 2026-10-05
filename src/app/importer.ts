@@ -1,13 +1,13 @@
 // Opening a drawing from a file (spec §5.3–§5.5): read it into strokes, clean and simplify them
-// (§13), normalize to [-1, 1]² (§3), join ends that nearly meet (D38), order them in the worker
-// (§4.6), and pick N for its length.
+// (§13), normalize to [-1, 1]² (§3), join ends that nearly meet (D38), find the one walk over them
+// in the worker (§4.6, D46), and pick N for its length.
 import { BRIDGE_SHARE, bridgeEnds } from '../core/bridge.ts';
 import { curvesToStrokes, parseCurvesJson } from '../core/line2funcImport.ts';
-import { JUMP, PathError, buildPath, normalizeToUnit, prepareStrokes, strokesBBox, withPts, type Stroke } from '../core/path.ts';
+import { JUMP, PathError, buildPath, kindSpans, normalizeToUnit, prepareStrokes, strokesBBox, withPts, type Stroke } from '../core/path.ts';
+import type { Routed } from '../core/route.ts';
 import { simplifyDrawing } from '../core/simplify.ts';
 import { readSvg, svgItemsToStrokes, type ImportWarnings } from '../core/svgImport.ts';
 import { autoN, type NSize } from '../core/ticks.ts';
-import { applyTour, jumpLengthOf, originalOrder, type Tour } from '../core/tour.ts';
 import type { Pt } from '../core/fourier.ts';
 
 export type FileKind = 'svg' | 'line2func' | 'image' | 'project';
@@ -31,23 +31,27 @@ export function detectKind(name: string, text: string, mime = ''): FileKind | nu
 }
 
 export interface Prepared {
-  /** Normalized, cleaned, joined where ends nearly meet, and walked in tour order (see applyTour). */
+  /** Normalized, cleaned, joined where ends nearly meet, and cut into the pieces of one walk (core/route.ts). */
   strokes: Stroke[];
   /** Strokes in the file (after cleaning), before any were joined. */
   strokeCount: number;
-  /** Pen-down strokes after joining: the pen lifts once per stroke. */
+  /** Strokes once ends that nearly meet are joined: the lines the drawing is made of. */
   penDownStrokes: number;
+  /** Times the pen lifts on the walk. */
+  lifts: number;
   jumpRatio: number;
+  /** The pen-up share of the path had the file's strokes been chained as they are, in the file's order. */
   originalJumpRatio: number;
   N: NSize;
   /** i18n key → count, for things in the file that were left out or changed. */
   warnings: ImportWarnings;
 }
 
-type TourFn = (strokes: Stroke[]) => Promise<Tour>;
+/** core/route.ts's routeStrokes, here or in the worker. */
+export type RouteFn = (strokes: Stroke[], reach: number) => Promise<Routed>;
 
-/** What every kind of file goes through once it is strokes (y up): clean, simplify, normalize, order. */
-export async function finishImport(raw: Stroke[], warnings: ImportWarnings, tour: TourFn): Promise<Prepared | { error: string }> {
+/** What every kind of file goes through once it is strokes (y up): clean, simplify, normalize, join into one walk. */
+export async function finishImport(raw: Stroke[], warnings: ImportWarnings, route: RouteFn): Promise<Prepared | { error: string }> {
   let strokes: Stroke[];
   try {
     strokes = prepareStrokes(raw);
@@ -62,37 +66,39 @@ export async function finishImport(raw: Stroke[], warnings: ImportWarnings, tour
   strokes = normalizeToUnit(prepareStrokes(simple.strokes));
   const strokeCount = strokes.length;
   // The baseline shown next to the result: the file's strokes as they are, in the file's order.
-  const fileJump = jumpLengthOf(strokes, originalOrder(strokes));
-  const fileInk = strokes.reduce((s, st) => s + strokeLength(st), 0);
+  const asFiled = buildPath(strokes);
 
-  // Gaps narrower than 0.5% of the drawing are crossed pen-down (the long side is 2 after normalizing).
-  const bridged = bridgeEnds(strokes, BRIDGE_SHARE * 2);
+  // Gaps narrower than 0.5% of the drawing are crossed pen-down (the long side is 2 after normalizing):
+  // between ends here, anywhere along the strokes in the walk.
+  const reach = BRIDGE_SHARE * 2;
+  const bridged = bridgeEnds(strokes, reach);
   if (bridged.bridges > 0) warnings['import.bridged'] = bridged.bridges;
   strokes = prepareStrokes(bridged.strokes);
 
-  const t = await tour(strokes);
-  const walked = applyTour(strokes, t.steps);
-  const path = buildPath(prepareStrokes(walked));
+  // If the walk cannot be found the drawing still opens, its strokes chained as they are.
+  let walked = strokes;
+  try {
+    const routed = await route(strokes, reach);
+    walked = prepareStrokes(routed.strokes);
+    if (routed.links > 0) warnings['import.linked'] = routed.links;
+  } catch {
+    warnings['import.unrouted'] = 1;
+  }
+  const path = buildPath(walked);
   return {
     strokes: walked,
     strokeCount,
     penDownStrokes: strokes.length,
+    lifts: kindSpans(path, JUMP).length,
     jumpRatio: path.lengths[JUMP] / path.total,
-    originalJumpRatio: fileJump / (fileInk + fileJump),
+    originalJumpRatio: asFiled.lengths[JUMP] / asFiled.total,
     N: autoN(path.total),
     warnings,
   };
 }
 
-const strokeLength = (s: Stroke) => {
-  const pts = s.closed ? [...s.pts, s.pts[0]] : s.pts;
-  let len = 0;
-  for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-  return len;
-};
-
 /** An SVG file or line2func's curves.json. */
-export async function prepareImport(kind: 'svg' | 'line2func', text: string, tour: TourFn): Promise<Prepared | { error: string }> {
+export async function prepareImport(kind: 'svg' | 'line2func', text: string, route: RouteFn): Promise<Prepared | { error: string }> {
   const warnings: ImportWarnings = {};
   let raw: Stroke[];
   if (kind === 'svg') {
@@ -109,7 +115,7 @@ export async function prepareImport(kind: 'svg' | 'line2func', text: string, tou
     else if (c.skippedFill > 0) warnings['line2func.skippedFill'] = c.skippedFill;
     raw = c.strokes;
   }
-  return finishImport(raw, warnings, tour);
+  return finishImport(raw, warnings, route);
 }
 
 /** Strokes traced from an image (pixel coordinates, y down; see core/raster.ts), turned y up. */

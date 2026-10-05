@@ -54,6 +54,10 @@ export interface Debug {
   circles: { k: number; r: number; x: number; y: number }[];
   frame: { tip: [number, number]; penUp: boolean; circlesDrawn: number } | null;
   strokes: number;
+  /** The pieces the drawing is walked in, and the path's length by kind (0 ink, 1 closure, 2 jump, 3 fill, 4 walked again). */
+  pieces: number;
+  lengths: number[];
+  camera: { s: number; cx: number; cy: number; ox: number; oy: number };
   highlight: { x: number; y: number; r: number; j: number } | null;
   tipScreen: [number, number] | null;
   calls: Record<string, number>;

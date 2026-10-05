@@ -1,11 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { fillSpacing } from '../../src/core/fill.ts';
 import { mulberry32, type Pt } from '../../src/core/fourier.ts';
 import { curvesToStrokes, parseCurvesJson, type CurvesJson } from '../../src/core/line2funcImport.ts';
-import { JUMP, buildPath, normalizeToUnit, prepareStrokes, type Stroke } from '../../src/core/path.ts';
+import { prepareStrokes, type Stroke } from '../../src/core/path.ts';
+import { routeStrokes } from '../../src/core/route.ts';
 import { douglasPeucker, simplifyDrawing } from '../../src/core/simplify.ts';
-import { applyTour, jumpLengthOf, optimizeTour, originalOrder } from '../../src/core/tour.ts';
 import { handle, pack, unpack } from '../../src/worker/protocol.ts';
 
 const curves = (overrides: Partial<CurvesJson> = {}): CurvesJson => ({
@@ -118,70 +117,28 @@ function randomStrokes(seed: number, n: number): Stroke[] {
   });
 }
 
-describe('ordering strokes (spec §4.6, M2 acceptance)', () => {
-  it('never makes the jumps longer than the original order, and is the same every time', () => {
-    for (let seed = 1; seed <= 200; seed++) {
-      const strokes = randomStrokes(seed, 2 + (seed % 25));
-      const tour = optimizeTour(strokes);
-      const original = jumpLengthOf(strokes, originalOrder(strokes));
-      expect(tour.originalJumpLength).toBe(original);
-      expect(tour.jumpLength).toBeLessThanOrEqual(original);
-      expect(tour.jumpLength).toBe(jumpLengthOf(strokes, tour.steps));
-      expect(optimizeTour(strokes)).toEqual(tour);
-      expect(new Set(tour.steps.map(s => s.index)).size).toBe(strokes.length);
-    }
-  });
-
-  it('usually does much better, and leaves an already optimal order alone', () => {
-    const strokes = randomStrokes(7, 60);
-    const tour = optimizeTour(strokes);
-    expect(tour.jumpLength).toBeLessThan(0.5 * tour.originalJumpLength);
-    // Collinear segments end to start: the original order is optimal and is kept.
-    const row: Stroke[] = Array.from({ length: 6 }, (_, i) => ({ closed: false, pts: [[2 * i, 0], [2 * i + 1, 0]] }));
-    const kept = optimizeTour(row);
-    expect(kept.jumpLength).toBe(kept.originalJumpLength);
-  });
-
-  it('closed strokes are entered at the vertex nearest the way in and out', () => {
-    const ring = (cx: number, n = 12): Stroke => ({ closed: true, pts: Array.from({ length: n }, (_, i) => [cx + Math.cos((2 * Math.PI * i) / n), Math.sin((2 * Math.PI * i) / n)] as Pt) });
-    const strokes = [ring(0), ring(5), ring(10)];
-    const tour = optimizeTour(strokes);
-    // Entered at vertex 0 the rings cost 5 + 5 + 10; entered at the vertices facing each other the
-    // jumps go 1 → 4..6 → 9 and back to 1: twice 8, which is the least possible.
-    expect(tour.originalJumpLength).toBeCloseTo(20, 9);
-    expect(tour.jumpLength).toBeCloseTo(16, 9);
-  });
-
-  it('the walked strokes give the same jump length as the tour', () => {
-    const strokes = normalizeToUnit(prepareStrokes(randomStrokes(11, 30)));
-    const tour = optimizeTour(strokes);
-    const path = buildPath(prepareStrokes(applyTour(strokes, tour.steps)));
-    expect(path.lengths[JUMP]).toBeCloseTo(tour.jumpLength, 9);
-  });
-
-  it('the worker’s handler packs, orders and answers', () => {
+describe('the worker’s handler (spec §9)', () => {
+  it('packs strokes with what they are: closed, painting an area, walked along again', () => {
     const strokes = randomStrokes(5, 12);
     expect(unpack(pack(strokes))).toEqual(strokes);
-    const painted = [...strokes, { pts: [[0, 0], [1, 0], [1, 1]] as Pt[], closed: true, fill: 0.125 }];
-    expect(unpack(pack(painted))).toEqual(painted);
-    expect(applyTour(painted, optimizeTour(painted).steps).filter(s => s.fill)).toHaveLength(1);
-    const res = handle({ id: 7, type: 'tour', strokes: pack(strokes) });
-    expect(res).toMatchObject({ id: 7, ok: true });
-    if (res.ok && 'tour' in res) expect(res.tour).toEqual(optimizeTour(strokes));
-    else throw new Error('expected a tour');
+    const marked: Stroke[] = [
+      ...strokes,
+      { pts: [[0, 0], [1, 0], [1, 1]], closed: true, fill: 0.125 },
+      { pts: [[1, 1], [0, 0]], closed: false, again: true },
+    ];
+    expect(unpack(pack(marked))).toEqual(marked);
   });
 
-  const real = new URL('../../../line2func/out/curves.json', import.meta.url);
-  it.skipIf(!existsSync(real))('line2func’s own output (local benchmark): pen-up under a quarter of the path', () => {
-    const read = parseCurvesJson(readFileSync(real, 'utf8'));
-    if ('error' in read) throw new Error(read.error);
-    const strokes = normalizeToUnit(prepareStrokes(curvesToStrokes(read.doc).strokes));
-    const started = performance.now();
-    const tour = optimizeTour(strokes);
-    const ms = performance.now() - started;
-    const path = buildPath(prepareStrokes(applyTour(strokes, tour.steps)));
-    const share = path.lengths[JUMP] / path.total;
-    console.log(`line2func out/curves.json: ${strokes.length} strokes, pen-up ${(100 * share).toFixed(1)}% in ${ms.toFixed(0)} ms`);
-    expect(share).toBeLessThan(0.25);
+  it('answers a route request with the walk routeStrokes finds, and a failure with its message', () => {
+    const strokes = prepareStrokes(randomStrokes(5, 12));
+    const res = handle({ id: 7, type: 'route', strokes: pack(strokes), reach: 0.2 });
+    if (!res.ok || !('route' in res)) throw new Error('expected a route');
+    const walk = routeStrokes(strokes, 0.2);
+    expect(res.id).toBe(7);
+    expect(unpack(res.route.strokes)).toEqual(walk.strokes);
+    expect({ ...res.route, strokes: null }).toEqual({ ...walk, strokes: null });
+    expect(walk.strokes.some(s => s.again)).toBe(true);
+    // Nothing to walk: the error comes back as text instead of being thrown across the worker.
+    expect(handle({ id: 8, type: 'route', strokes: pack([]), reach: 0.2 })).toEqual({ id: 8, ok: false, error: 'path rejected: empty' });
   });
 });

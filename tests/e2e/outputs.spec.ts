@@ -108,6 +108,8 @@ test('a line-art image is traced into strokes', async ({ page }) => {
   const d = await debug(page);
   expect(d.state.source).toMatchObject({ type: 'image', name: 'ring-and-cross.png' });
   expect(d.strokes).toBe(3); // the ring, and the cross as two lines through its middle (D39)
-  expect(d.jumpRatio).toBeGreaterThan(0);
+  expect(d.pieces).toBeGreaterThan(3); // walked in more pieces: the two lines meet where they cross (D46)
+  expect(d.lengths[4]).toBeGreaterThan(0); // and the pen walks back along them rather than jump from arm to arm
+  expect(d.jumpRatio).toBeGreaterThan(0); // the ring is too far to walk to
   await expect(page.locator('#metric-jumps')).toContainText('原始順序');
 });

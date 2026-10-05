@@ -1,5 +1,5 @@
-// Spec §12 M2: SVG and curves.json import, chaining strokes with pen-up jumps that are not drawn,
-// the spectrum panel in step with the circles, and following the pen.
+// Spec §12 M2: SVG and curves.json import, the strokes joined into one walk whose pen-up moves are
+// drawn apart from the lines, the spectrum panel in step with the circles, and following the pen.
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
@@ -40,7 +40,7 @@ async function colourNear(page: Page, colour: 'ink' | 'grey', p: Point, r = 2): 
 }
 const inkNear = (page: Page, p: Point, r = 2) => colourNear(page, 'ink', p, r);
 
-test('an SVG with four shapes: chained with jumps, drawn black with grey jumps that can be hidden, the share shown', async ({ page }) => {
+test('an SVG with four shapes far apart: walked with jumps, drawn black with grey jumps that can be hidden, the share shown', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); // paused, with the whole approximation drawn
   await open(page);
   await upload(page, 'four-shapes.svg');
@@ -58,7 +58,7 @@ test('an SVG with four shapes: chained with jumps, drawn black with grey jumps t
   await page.waitForTimeout(200);
   const jumps = await evalDebug<Point[]>(page, 'mids', 2);
   const inks = await evalDebug<Point[]>(page, 'mids', 0);
-  expect(jumps.length).toBe(4); // three between the shapes and the one back to the start
+  expect(jumps.length).toBe(4); // four shapes, each too far from the others to walk to: four pen lifts
   for (const p of jumps) expect(await inkNear(page, p), `jump at ${p}`).toBe(false);
   let grey = 0;
   for (const p of jumps) if (await colourNear(page, 'grey', p, 4)) grey++;
@@ -73,7 +73,41 @@ test('an SVG with four shapes: chained with jumps, drawn black with grey jumps t
   for (const p of jumps) expect(await colourNear(page, 'grey', p, 4), `jump at ${p}`).toBe(false);
 });
 
-test('line2func curves.json: strokes chained, fill hatching left out and said so', async ({ page }) => {
+test('strokes that nearly touch are joined there, pen down, and the pen walks back instead of jumping (D46)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); // paused, with the whole approximation drawn
+  await open(page);
+  await upload(page, 'tee.svg');
+  await expect(page.locator('#toast')).toContainText('1 處把靠得很近的筆畫接起來');
+  const d = await debug(page);
+  expect(d.state.source).toMatchObject({ type: 'svg', name: 'tee.svg', strokes: 2 });
+  await expect(page.locator('#status')).toContainText('2 筆畫');
+  expect(d.pieces).toBeGreaterThan(2); // the bar in two halves, the link, the stem, and the ways back
+  // No pen-up move at all: the share is not even shown.
+  expect(d.jumpRatio).toBe(0);
+  expect(d.lengths[2]).toBe(0);
+  await expect(page.locator('#metric-jumps-row')).toBeHidden();
+  expect(await evalDebug<Point[]>(page, 'mids', 2)).toEqual([]);
+  // A closed walk over a T goes along everything twice: as much walked again as drawn.
+  expect(d.lengths[4]).toBeCloseTo(d.lengths[0], 9);
+  expect(d.frame!.penUp).toBe(false); // back at the start, on a line it drew: the pen is down
+
+  // The link is a line like the others: a piece of ink across the gap, 0.6 long of the drawing's 160.
+  const toScreen = ([x, y]: Point): Point => [d.camera.ox + d.camera.s * (x - d.camera.cx), d.camera.oy - d.camera.s * (y - d.camera.cy)];
+  const link = toScreen([0, (110 - 40.3) / 80]); // the middle of the gap, in the drawing's own units (long side 2, y up)
+  const inks = await evalDebug<Point[]>(page, 'mids', 0);
+  expect(inks.some(p => Math.hypot(p[0] - link[0], p[1] - link[1]) < 0.5)).toBe(true);
+  const again = await evalDebug<Point[]>(page, 'mids', 4);
+  expect(again.length).toBeGreaterThan(0);
+
+  // Black along every line, whether the pen passes once or twice.
+  await page.getByText('顯示圓', { exact: true }).click();
+  await page.waitForTimeout(200);
+  let drawn = 0;
+  for (const p of [...inks, ...again]) if (await inkNear(page, p, 3)) drawn++;
+  expect(drawn / (inks.length + again.length)).toBeGreaterThan(0.9);
+});
+
+test('line2func curves.json: strokes joined, fill hatching left out and said so', async ({ page }) => {
   await open(page);
   await upload(page, 'curves-small.json');
   await expect(page.locator('#toast')).toContainText('略過 1 條填色斜線');

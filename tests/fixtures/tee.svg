@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- A T whose stem stops 0.6 short of the bar, 0.375% of the drawing's 160: two strokes that nearly
+       touch, but not end to end. The pen crosses there with the pen down and walks back along the
+       lines instead of jumping (DECISIONS.md D46). -->
+  <path d="M20 40 H180 M100 40.6 V180" fill="none" stroke="#000"/>
+</svg>

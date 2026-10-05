@@ -11,8 +11,9 @@ export const PROJECT_FORMAT = 'line2fourier.project';
 /**
  * 2: imports join near ends (D38); images outline solid areas and walk Euler trails (D39, D40).
  * 3: solid areas of pictures and line2func's filled areas are painted in (D42).
+ * 4: imported strokes are joined into one walk, where they are nearest (D46).
  */
-export const ENGINE = 3;
+export const ENGINE = 4;
 
 /**
  * The source as saved: an imported file is kept by name and SHA-256, and its text only when the

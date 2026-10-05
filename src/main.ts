@@ -4,8 +4,8 @@ import './styles/main.css';
 import { advance, cycleMs } from './app/clock.ts';
 import { createPipeline, type Computed, type Ordered } from './app/pipeline.ts';
 import { bytesToDataUrl, dataUrlToBytes, decodeImage } from './app/image.ts';
-import { detectKind, finishImport, imageStrokes, prepareImport, sha256Hex, type Prepared } from './app/importer.ts';
-import { parseProject, projectText, type ProjectFile } from './app/project.ts';
+import { detectKind, finishImport, imageStrokes, prepareImport, sha256Hex, type Prepared, type RouteFn } from './app/importer.ts';
+import { parseProject, projectText, savedSource, type ProjectFile } from './app/project.ts';
 import { ZOOM_MAX, defaultState, normalizeState, type AppState, type ImportKind, type ImportedSource, type SourceSpec } from './app/state.ts';
 import { createStore } from './app/store.ts';
 import { partialCurve, type Pt } from './core/fourier.ts';
@@ -417,7 +417,8 @@ $('#copy-latex').addEventListener('click', () => {
 });
 $('#download-json').addEventListener('click', () => {
   const s = store.get();
-  const text = toCoefficientsJson(computed.spectrum, computed.ordered.terms, { M: computed.M, order: s.order, source: s.source });
+  // The source as a project names it: an opened file by name and hash, not its contents and every piece of the walk.
+  const text = toCoefficientsJson(computed.spectrum, computed.ordered.terms, { M: computed.M, order: s.order, source: savedSource(s.source, false) });
   downloadText(text, 'line2fourier-coefficients.json', 'application/json');
 });
 $('#download-svg').addEventListener('click', () => {
@@ -449,6 +450,9 @@ fileInput.addEventListener('change', () => {
 
 type Settings = Pick<ProjectFile, 'N' | 'M' | 'order' | 'speed' | 'view'>;
 
+/** The walk over an opened drawing's strokes is found in the worker (core/route.ts). */
+const route: RouteFn = (strokes, reach) => worker.route(strokes, reach);
+
 /** A project whose imported drawing was not embedded: the next such file opened is taken as that drawing. */
 let relink: { kind: ImportKind; sha256: string; settings: Settings; notes: string[] } | null = null;
 
@@ -464,7 +468,7 @@ async function openFile(file: File): Promise<void> {
     await openProject(text);
   } else if (kind === 'svg' || kind === 'line2func') {
     const project = await takeRelink(kind, text);
-    await importDrawing({ kind, name: file.name, sha256: await sha256Hex(text), content: text }, () => prepareImport(kind, text, s => worker.tour(s)), project?.settings, project?.notes);
+    await importDrawing({ kind, name: file.name, sha256: await sha256Hex(text), content: text }, () => prepareImport(kind, text, route), project?.settings, project?.notes);
   } else {
     toast(t('import.error.unknown'), 'error');
   }
@@ -496,7 +500,7 @@ async function openImage(name: string, bytes: Uint8Array, mime: string, settings
       return { error: 'import.error.image' };
     }
     const traced = await worker.raster(img.data, img.width, img.height);
-    return finishImport(imageStrokes(traced.strokes, traced.h), { ...traced.warnings }, s => worker.tour(s));
+    return finishImport(imageStrokes(traced.strokes, traced.h), { ...traced.warnings }, route);
   }, settings, notes);
 }
 
@@ -515,7 +519,7 @@ async function importDrawing(file: Incoming, prepare: () => Promise<Prepared | {
   }
   const source: ImportedSource = {
     type: file.kind, name: file.name, sha256: file.sha256, content: file.content,
-    strokes: prepared.strokes, originalJumpRatio: prepared.originalJumpRatio,
+    strokes: prepared.strokes, strokeCount: prepared.penDownStrokes, originalJumpRatio: prepared.originalJumpRatio,
   };
   tCycle = 0;
   if (settings) {
@@ -564,7 +568,7 @@ async function openProject(text: string): Promise<void> {
   }
   const kind = src.type, content = src.content;
   if ((await sha256Hex(content)) !== src.sha256) notes.push(t('project.hashMismatch'));
-  await importDrawing({ kind, name: src.name, sha256: src.sha256, content }, () => prepareImport(kind, content, s => worker.tour(s)), settings, notes);
+  await importDrawing({ kind, name: src.name, sha256: src.sha256, content }, () => prepareImport(kind, content, route), settings, notes);
 }
 
 // Files dropped anywhere on the page, or pasted (after line2func's viewer/app.js).
@@ -646,7 +650,7 @@ function showControls(s: AppState): void {
     ? t('status.random', { M: String(s.M), N: String(s.N), kind: t(GENERATOR_KEYS[src.generator]), seed: String(src.seed) })
     : src.type === 'freehand'
       ? t('status.freehand', { M: String(s.M), N: String(s.N) })
-      : t('status.import', { kind: t(`kind.${src.type}`), name: src.name, strokes: src.strokes.length, M: String(s.M), N: String(s.N) });
+      : t('status.import', { kind: t(`kind.${src.type}`), name: src.name, strokes: src.strokeCount, M: String(s.M), N: String(s.N) });
   $('#status').textContent = s.demo ? `${status} · ${t('status.demo', { step: s.demo.step + 1, steps: demoSequence(s.N).length })}` : status;
   view.canvas.setAttribute('aria-label', t('canvas.label', { n: s.M }));
 }
@@ -750,7 +754,7 @@ Object.defineProperty(window, '__l2f', {
           ...s,
           source: s.source.type === 'random' ? s.source
             : s.source.type === 'freehand' ? { type: s.source.type, points: s.source.points.length }
-              : { type: s.source.type, name: s.source.name, sha256: s.source.sha256, strokes: s.source.strokes.length, originalJumpRatio: s.source.originalJumpRatio },
+              : { type: s.source.type, name: s.source.name, sha256: s.source.sha256, strokes: s.source.strokeCount, originalJumpRatio: s.source.originalJumpRatio },
         },
         t: tCycle,
         firstCycleDone,
@@ -760,7 +764,11 @@ Object.defineProperty(window, '__l2f', {
         metrics: computed.metrics,
         jumpRatio: computed.jumpRatio,
         used: computed.ordered.terms.slice(0, computed.M).map(c => c.k),
-        strokes: computed.strokes.length,
+        /** The drawing's strokes; an opened drawing is walked in more pieces than that (DECISIONS.md D46). */
+        strokes: s.source.type === 'random' || s.source.type === 'freehand' ? computed.strokes.length : s.source.strokeCount,
+        pieces: computed.strokes.length,
+        /** Lengths of the path by kind: 0 ink, 1 closure, 2 jump, 3 fill, 4 walked again. */
+        lengths: Array.from(computed.path.lengths),
         highlight: view.last?.highlight
           ? { x: cam.ox + cam.s * (view.last.highlight.x - cam.cx), y: cam.oy - cam.s * (view.last.highlight.y - cam.cy), r: view.last.highlight.r * cam.s, j: view.last.highlight.j }
           : null,
@@ -770,7 +778,7 @@ Object.defineProperty(window, '__l2f', {
         viewZoom: view.zoom,
         scale: cam.s,
         camera: { ...cam },
-        /** Midpoints of the original path's segments of each kind, on screen (0 ink, 1 closure, 2 jump, 3 fill). */
+        /** Midpoints of the original path's segments of each kind, on screen (0 ink, 1 closure, 2 jump, 3 fill, 4 walked again). */
         mids: (kind: number) => Array.from(computed.path.kinds).flatMap((k, i) => {
           if (k !== kind) return [];
           const a = computed.path.poly[i], b = computed.path.poly[(i + 1) % computed.path.poly.length];

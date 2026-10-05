@@ -9,14 +9,17 @@ export type { Lang };
 
 export type ImportKind = 'svg' | 'line2func' | 'image';
 
-/** An imported file, already prepared: its strokes are cleaned, normalized and in tour order. */
+/** An imported file, already prepared: its strokes are cleaned, normalized and cut into the pieces of one walk. */
 export interface ImportedSource {
   type: ImportKind;
   name: string;
   sha256: string;
   /** The file's text (an image's as a data: URL), kept so a project can embed it. */
   content: string;
+  /** The pieces of the walk over the drawing, in walking order (core/route.ts): many more than its strokes. */
   strokes: Stroke[];
+  /** The drawing's strokes, ends that nearly meet joined: what the page counts. */
+  strokeCount: number;
   /** Jump length / path length had the strokes been chained in the file's order (spec §4.6). */
   originalJumpRatio: number;
 }
