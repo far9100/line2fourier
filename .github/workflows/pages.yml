@@ -1,3 +1,5 @@
+# The online page: test line2fourier, build it (npm run build) and publish dist/ with GitHub Pages.
+# It needs Settings -> Pages -> Source: "GitHub Actions" in the repository.
 name: Online page
 
 on:

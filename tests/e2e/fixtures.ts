@@ -9,7 +9,8 @@ export interface Problems {
 }
 
 export const test = base.extend<{ problems: Problems }>({
-  problems: async ({ page, baseURL }, use) => {
+  // Every test is watched, whether or not it asks for `problems` (to read the CSP violations).
+  problems: [async ({ page, baseURL }, use) => {
     const external: string[] = [];
     const errors: string[] = [];
     page.on('request', r => {
@@ -30,7 +31,7 @@ export const test = base.extend<{ problems: Problems }>({
     });
     expect(external, 'requests outside the site').toEqual([]);
     expect(errors, 'script errors').toEqual([]);
-  },
+  }, { auto: true }],
 });
 
 export { expect };

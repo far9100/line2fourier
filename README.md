@@ -26,13 +26,15 @@ P=[0.38877,-1.23757,-2.15266]
 
 ### Use it online
 
-The repository carries a GitHub Pages workflow (`.github/workflows/pages.yml`). With Pages set to
-"GitHub Actions", every push to `main` publishes the page, and it runs entirely in the visitor's
-browser.
+Open **<https://far9100.github.io/line2fourier/>**: nothing to install. The page starts with a
+random drawing being drawn by its circles; draw your own, or drop an SVG file, a picture of line
+art or a line2func `curves.json` onto it. Everything runs in your browser, so nothing you draw or
+open is uploaded anywhere. What follows applies to the online page and to a copy on your own
+computer alike.
 
 ### Install
 
-You need Node.js 22.12 or newer.
+To run it on your own computer you need Node.js 22.12 or newer.
 
 ```
 npm ci
@@ -168,11 +170,11 @@ P=[0.38877,-1.23757,-2.15266]
 
 ### 線上使用（免安裝）
 
-專案附有 GitHub Pages 的 workflow（`.github/workflows/pages.yml`）。在 Pages 設定把來源選為「GitHub Actions」，之後每次推送到 `main` 就會自動發布，網頁完全在使用者的瀏覽器裡執行。
+打開 **<https://far9100.github.io/line2fourier/>**，不用安裝任何東西。頁面一開就有一張隨機線稿正被一串圓畫出來；可以自己畫，也可以把 SVG 檔、線稿圖片或 line2func 的 `curves.json` 拖進頁面。所有運算都在你的瀏覽器裡完成，畫的線與開啟的檔案都不會上傳到任何地方。以下的說明，線上版和裝在自己電腦上的版本都適用。
 
 ### 安裝
 
-需要 Node.js 22.12 以上。
+要在自己的電腦上執行，需要 Node.js 22.12 以上。
 
 ```
 npm ci
