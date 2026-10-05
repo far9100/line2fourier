@@ -61,23 +61,28 @@ npm run bench      # how long the maths takes (spec §6)
 - **Open a drawing** takes an SVG file, line2func's `curves.json` or a picture of line art (PNG,
   JPEG, …; you can also drop a file on the page or paste one). A picture is thinned to
   one-pixel lines and traced, with areas of solid ink outlined and painted in; for photos and
-  pencil sketches, trace them with line2func first and open its `curves.json`. Stroke ends that
-  almost meet (within half a percent of the drawing) are joined pen-down, and lines go on through
-  junctions, so the pen lifts only where the drawing makes it. Solid areas, and line2func's
-  filled areas, are painted ring by ring with a pen wider than the rings are apart, so they come
-  out solid. Every stroke is chained into one closed path; the pen-up jumps between
-  strokes are computed with the rest and drawn as thin grey lines, apart from the drawing (turn
-  them off with **Show pen-up moves**), and their order is chosen to keep them short.
-  The number of samples and of circles is picked for the drawing; the card shows the pen-up share
-  against the file's own order.
+  pencil sketches, trace them with line2func first and open its `curves.json`. Solid areas, and
+  line2func's filled areas, are painted ring by ring with a pen wider than the rings are apart,
+  so they come out solid.
+- **One walk over the drawing.** The strokes of a drawing rarely touch, but they come close,
+  mostly somewhere along their length rather than at their ends. So the pen crosses from stroke
+  to stroke where they are nearest: with the pen down where the gap is at most half a percent of
+  the drawing, lifted where it is wider. To get from one place to another it walks back along
+  lines it has already drawn, without drawing them again, and lifts only where that would be
+  more than five times as far as jumping. The pen-up moves that are left are computed with the
+  rest and drawn as thin grey lines, apart from the drawing (turn them off with
+  **Show pen-up moves**). The number of samples (up to 16,384) and of circles is picked so that
+  the lines come out within their own width; the card shows the pen-up share against the file's
+  own order. How this was arrived at, with measurements and sources, is in
+  [DECISIONS.md](DECISIONS.md) (D46, D47).
 - **Spectrum** shows |c_k| on a log scale with the circles in use in brass. Pick a term (pointer or
   arrow keys) to mark its circle on the canvas and read k, |c_k| and arg(c_k).
 - **Follow the pen** keeps the pen in the middle, magnified up to 50 times (zoom with the buttons or
   the wheel), so the smallest circles can be seen. Dragging the view stops following.
 - **Show convergence** runs through 1, 2, 3, 5, 10, 20, 50, 100, 300 and 1000 circles, one cycle
   each.
-- **Number of circles** moves along the scale 1, 2, 3, 4, 5, 6, 8, 10, … 1000 up to N − 1; the box
-  next to it takes any whole number.
+- **Number of circles** moves along the scale 1, 2, 3, 4, 5, 6, 8, 10, … 1000, … 12000 up to N − 1;
+  the box next to it takes any whole number.
 - **By size** (under **More settings**) uses the largest circles first: for any number of circles
   that is the closest fit there is. **By frequency** uses the slowest first, like a low-pass filter.
 - Keys: Space plays and pauses; ← and → change the number of circles (with Shift, one at a time);
@@ -89,7 +94,7 @@ npm run bench      # how long the maths takes (spec §6)
 | Number | Meaning |
 |---|---|
 | RMS error | The root mean square distance from the samples to the curve, as a share of the drawing's size |
-| Pen-up share | For drawings of several strokes: the part of the path that is jumps between strokes, and what it would be in the file's order |
+| Pen-up share | For drawings of several strokes: the part of the path the pen travels lifted, and what it would be with the strokes chained end to start in the file's order |
 
 The size of a drawing is the long side of its bounding box. The energy ratio, the mean deviation
 and the largest circle are no longer shown: the first reads 99.9…% for almost any drawing, the
@@ -106,8 +111,9 @@ and they become four expressions; t runs from 0 to 1 by default.
 numbers at its ends and set it to run from 1 in steps of 1.
 
 Both were pasted into Desmos and checked against the page; the screenshots are in
-[docs/acceptance](docs/acceptance/). Desmos draws the pen-up jumps between strokes, which the page
-leaves out.
+[docs/acceptance](docs/acceptance/). Desmos draws the whole curve in one colour: the pen-up moves
+too, and the lines the pen walks along twice (those lie on the drawing). A list in Desmos holds at
+most 10,000 numbers, so with more circles than that only the first 10,000 are copied.
 
 ### Saving
 
@@ -138,8 +144,8 @@ Opening a project computes everything again and gives exactly the same result.
 - How fast depends on how smooth the curve is: on a curve that is smooth everywhere the coefficients
   fall off quickly; with sharp corners |c_k| falls off about like 1/k², so with too few circles the
   corners are rounded and straight edges ripple.
-- The page takes N points at equal arc length along the line (N = 1024 unless you change it) and
-  uses their discrete Fourier transform. With all N − 1 circles the curve passes through every one
+- The page takes N points at equal arc length along the line (N = 1024 unless you change it; an
+  opened drawing gets up to 16,384) and uses their discrete Fourier transform. With all N − 1 circles the curve passes through every one
   of those points.
 
 ### More
@@ -190,11 +196,12 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 - **整頁就是一個畫面。** 線稿佔滿右側窄面板以外的空間，並自動縮放到剛好放得下。在畫面上用滾輪（或兩指）以游標為中心縮放、拖曳移動，點兩下或按 0 回到整張，按全螢幕鈕（或 F）只留下畫布。線畫成黑色（深色畫面是白色），跳線是灰色。面板上隨時看得到圓、顯示選項與逼近程度；頻譜、算式與匯出、實體輸出和較少用的設定則收起來，要用時再展開。
 - 〔換一張線稿〕隨機產生小怪獸、塗鴉或尖角星形，旁邊的選單可以指定類型。〔更多設定〕裡會顯示種子，也可以輸入種子，畫出同一張線稿。
 - 〔自己畫〕：用滑鼠、手指或觸控筆在畫布上按住拖曳，放開就完成。線會用一段直線自動閉合，以虛線標示。
-- 〔上傳線稿〕可以開啟 SVG 檔、line2func 的 `curves.json` 或線稿圖片（PNG、JPEG 等；也可以直接把檔案拖進頁面或貼上）。圖片會先細線化成一像素寬，再追蹤成線條，塗黑的區域則描外框並塗滿；照片和鉛筆稿請先用 line2func 描線，再開啟它的 `curves.json`。端點幾乎相接（距離不到圖大小的 0.5%）的筆畫會直接畫線連起來，線也會穿過分岔點繼續畫，只在線稿本身逼不得已的地方抬筆。塗黑的區域（以及 line2func 的填色區）會用比圈距寬的筆一圈圈塗滿，畫出來是實心的。所有筆畫會串成一條封閉路徑：筆畫之間的跳線照常參與計算，並用細細的灰線畫出來，和線稿分開（可用〔顯示跳線〕關掉），順序也會重新安排，讓跳線盡量短。取樣點數與圓的數量會依圖自動選定；指標卡會顯示跳線比例，並與檔案原本的順序比較。
+- 〔上傳線稿〕可以開啟 SVG 檔、line2func 的 `curves.json` 或線稿圖片（PNG、JPEG 等；也可以直接把檔案拖進頁面或貼上）。圖片會先細線化成一像素寬，再追蹤成線條，塗黑的區域則描外框並塗滿；照片和鉛筆稿請先用 line2func 描線，再開啟它的 `curves.json`。塗黑的區域（以及 line2func 的填色區）會用比圈距寬的筆一圈圈塗滿，畫出來是實心的。
+- **整張線稿走成一條路徑。** 線稿的筆畫很少相連，但彼此靠得很近，而且近的地方多半在線身上，不在端點。所以筆從一條筆畫到另一條，是在兩者最近的地方過去：斷口不超過圖大小的 0.5% 就落筆畫線，更寬才抬筆。要從一處到另一處時，筆沿著已經畫過的線走回去（不畫第二次），只有走回去的路超過直接跳過去的 5 倍才抬筆。剩下的跳線照常參與計算，並用細細的灰線畫出來，和線稿分開（可用〔顯示跳線〕關掉）。取樣點數（最多 16,384）與圓的數量會自動選到線條的偏差不超過線寬；指標卡會顯示跳線比例，並與檔案原本的順序比較。這個做法怎麼來的（量測與文獻）寫在 [DECISIONS.md](DECISIONS.md) 的 D46、D47。
 - 〔頻譜〕以對數刻度畫出 |c_k|，使用中的圓是黃銅色。點選一項（滑鼠或方向鍵），畫布上就會標出它的圓，並顯示 k、|c_k| 與 arg(c_k)。
 - 〔跟隨筆尖〕讓筆尖保持在畫面中央，最多放大 50 倍（用縮放鈕或滾輪調整），連最小的圓都看得到。拖曳畫面就會停止跟隨。
 - 〔示範收斂〕依序用 1、2、3、5、10、20、50、100、300、1000 個圓，各畫一輪。
-- 〔圓的數量〕沿著 1、2、3、4、5、6、8、10……1000 一直到 N − 1 的刻度移動；旁邊的輸入框可以填任何整數。
+- 〔圓的數量〕沿著 1、2、3、4、5、6、8、10……1000……12000 一直到 N − 1 的刻度移動；旁邊的輸入框可以填任何整數。
 - 〔依大小〕（在〔更多設定〕裡）先用最大的圓：在同樣的圓數下，這是誤差最小的選法。〔依頻率〕先用轉得最慢的圓，相當於低通濾波。
 - 鍵盤：空白鍵播放／暫停；←／→ 增減圓的數量（加 Shift 每次一個）；＋／− 放大縮小，0 看整張，F 全螢幕；D 開始自己畫；Esc 取消手繪或示範。
 
@@ -203,7 +210,7 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 | 數字 | 意義 |
 |---|---|
 | RMS 誤差 | 取樣點到逼近曲線距離的均方根，以線稿大小的百分比表示 |
-| 跳線比例 | 多筆畫的線稿中，筆畫之間跳線所占的比例，並與檔案原本的順序比較 |
+| 跳線比例 | 多筆畫的線稿中，筆抬起來移動的部分占整條路徑的比例；括號裡是筆畫照檔案原本的順序頭尾相接時的比例 |
 
 線稿大小是外框的長邊。能量比例、平均偏差與最大的圓不再顯示：能量比例幾乎任何線稿都是 99.9…%，平均偏差和 RMS 誤差說的是同一件事，最大的圓則看了也用不上（DECISIONS.md D45）。
 
@@ -213,7 +220,7 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 
 〔複製 Desmos 算式（含 M 滑桿）〕多一行 `M=…`，並改成對 `R[1...M]`、`K[1...M]`、`P[1...M]` 求和，清單至少有 300 個圓。Desmos 新建的滑桿從 −10 開始：點滑桿兩端的數字，把範圍改成從 1 開始、間隔 1。
 
-兩種版本都實際貼進 Desmos，並與網頁畫面比對過，截圖放在 [docs/acceptance](docs/acceptance/)。Desmos 會畫出筆畫之間的跳線，網頁則不畫。
+兩種版本都實際貼進 Desmos，並與網頁畫面比對過，截圖放在 [docs/acceptance](docs/acceptance/)。Desmos 會用同一個顏色畫出整條曲線：跳線也畫，筆走了兩次的線也畫（那些線本來就在線稿上）。Desmos 的清單最多放 10,000 個數，圓超過 10,000 個時只會複製前 10,000 個。
 
 ### 存檔
 
@@ -238,7 +245,7 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 - 把閉合曲線看成複數函數 z(t) = x(t) + i·y(t)，t ∈ [0, 1)，可寫成 z(t) = Σ c_k·e^{2πikt}。每一項是一個半徑 |c_k|、每輪轉 k 圈、起始角為 arg(c_k) 的圓。
 - **有限個圓永遠是近似。** 圓的數量趨近無限時，只要曲線連續且長度有限，部分和會均勻收斂到原曲線（Dirichlet–Jordan 定理）。
 - 收斂速度取決於曲線的光滑度：處處光滑的曲線，係數衰減得很快；有尖角的曲線 |c_k| 約以 1/k² 衰減，圓不夠時尖角會被磨圓、直邊出現小波紋。
-- 網頁沿著線以等弧長取 N 個點（預設 N = 1024），再做離散傅立葉轉換。用上全部 N − 1 個圓時，曲線會通過每一個取樣點。
+- 網頁沿著線以等弧長取 N 個點（預設 N = 1024；開啟的線稿最多 16,384），再做離散傅立葉轉換。用上全部 N − 1 個圓時，曲線會通過每一個取樣點。
 
 ### 更多說明
 

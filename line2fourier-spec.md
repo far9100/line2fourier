@@ -40,7 +40,7 @@
 
 | 參數 | 預設 | 說明 |
 |---|---|---|
-| 取樣數 `N` | 1024 | 2 的冪次，可選 512–8192 |
+| 取樣數 `N` | 1024 | 2 的冪次，可選 512–16384 |
 | 圓數 `M` | 50 | 滑桿採非線性刻度：1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 300, 500, 1000…，上限 `N − 1` |
 | 排序 | 依大小 | 另一選項：依頻率 `|k|` |
 | 一輪時間 | 8 秒（1× 速度） | 速度 0.25×–3× |
@@ -88,9 +88,12 @@ RMS 誤差  e_rms  = sqrt( Σ_{dropped} |c_k|² )      // 等於取樣點與逼�
 
 ### 4.6 多筆畫與跳線
 
-- 多筆畫（SVG、line2func、點陣圖）要串成一條封閉路徑：以最近鄰法決定筆畫順序與方向（每筆可正走或反走），可選 2-opt 改善，使跳線總長最小；最後一筆接回第一筆的起點。
-- 每個取樣點記錄是否落在跳線上（`penUp[n]`）。跳線照常參與傅立葉計算，但原始線稿與逼近軌跡在跳線處斷開不畫。
-- 跳線越長，需要的圓越多；UI 要顯示跳線總長占路徑總長的比例。
+- 多筆畫（SVG、line2func、點陣圖）要連成一條封閉路徑。真實線稿的筆畫並不相連，但彼此很近，而且近的地方多半不在端點，所以不以「端點接端點」排序，改用路徑檢查（route inspection，`DECISIONS.md` D46）：
+  - 筆畫在彼此最近的地方相接（最近點的最小生成樹）：斷口不超過長邊 0.5% 的落筆畫線，更寬的抬筆跳過去。
+  - 筆要從一處到另一處時，沿著已經畫過的線走回去，不畫第二次；走回去的路超過直線的 5 倍時才抬筆。
+  - 做法：奇數條線相交的點兩兩配對（最便宜的先配），再走 Euler 迴路。
+- 每個取樣點記錄它落在哪一種線段上；`penUp[n]` 是其中的跳線。跳線與重走的線段照常參與傅立葉計算，但不是線稿：跳線另外用細灰線畫出（可關閉），重走的線段不畫。
+- 路徑越長，需要的圓越多；UI 要顯示跳線總長占路徑總長的比例。
 
 ### 4.7 不變性（可當測試）
 
@@ -188,7 +191,7 @@ P=[1.20345,-0.51236,…]
 
 - TypeScript + Vite，純靜態網站，可部署到 GitHub Pages。
 - 繪圖用 Canvas 2D；FFT 用 §11 的實作；KaTeX 顯示公式；pdf-lib 產生翻頁書；WAV 自行寫入（16-bit PCM）。
-- Web Worker：大 N 的 FFT、SVG 與點陣圖處理、筆畫排序。
+- Web Worker：大 N 的 FFT、SVG 與點陣圖處理、把筆畫連成一條路徑。
 - 測試：Vitest（單元測試）；Playwright（端對端，選做）。
 - 不使用後端。
 
@@ -201,7 +204,7 @@ line2fourier/
 │  ├─ core/
 │  │  ├─ fourier.ts          // §11 參考實作
 │  │  ├─ generators.ts       // 小怪獸、塗鴉、尖角星形
-│  │  ├─ tour.ts             // 多筆畫串接、跳線遮罩
+│  │  ├─ route.ts            // 多筆畫連成一條路徑（路徑檢查）
 │  │  ├─ svgImport.ts
 │  │  ├─ line2funcImport.ts
 │  │  └─ raster.ts           // Otsu、Zhang–Suen、骨架追蹤（M3）
@@ -413,10 +416,11 @@ export function mulberry32(seed: number): () => number {
 
 ### M2
 
-- 內容：SVG 匯入、line2func `curves.json` 匯入、多筆畫串接與跳線、頻譜面板、排序切換、跟隨筆尖、點選高亮。
+- 內容：SVG 匯入、line2func `curves.json` 匯入、多筆畫連成一條路徑與跳線、頻譜面板、排序切換、跟隨筆尖、點選高亮。
 - 驗收：
-  - 含 3 個以上子路徑的 SVG 能正確串接，跳線不畫出，並顯示跳線總長比例。
-  - 排序後的跳線總長，不大於依原始順序串接的總長。
+  - 含 3 個以上子路徑的 SVG 能正確連成一條路徑，跳線不畫成線稿，並顯示跳線總長比例。
+  - 連接後的跳線總長，不大於依原始順序串接的總長。
+  - 每一段線稿恰好畫一次；重走的線段不重畫。
   - 頻譜面板中使用中的項目，與畫布上的圓一一對應。
 
 ### M3
@@ -461,3 +465,5 @@ export function mulberry32(seed: number): () => number {
 - T. Y. Zhang, C. Y. Suen. *A Fast Parallel Algorithm for Thinning Digital Patterns.* Communications of the ACM 27(3), 1984.
 - N. Otsu. *A Threshold Selection Method from Gray-Level Histograms.* IEEE Transactions on Systems, Man, and Cybernetics 9(1), 1979.
 - 3Blue1Brown. *But what is a Fourier series? From heat flow to drawing with circles*（2019，影片；視覺呈現可參考）。
+- F. J. Wong, S. Takahashi. *A Graph-based Approach to Continuous Line Illustrations with Variable Levels of Detail.* Computer Graphics Forum 30(7), 2011（§4.6：奇數頂點配對、重走或新連線的取捨）。
+- C. Liu, J. Hodgins, J. McCann. *Whole-Cloth Quilting Patterns from Photographs.* NPAR 2017（§4.6：以鄉村郵差問題把筆畫連成一條路徑）。
