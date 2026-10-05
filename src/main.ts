@@ -12,7 +12,7 @@ import { partialCurve, type Pt } from './core/fourier.ts';
 import { GENERATORS, newSeed, type GeneratorName } from './core/generators.ts';
 import { PathError } from './core/path.ts';
 import { N_CHOICES, SPEEDS, clampM, demoSequence, mTicks, sliderIndex, stepM, suggestM, type NSize } from './core/ticks.ts';
-import { SLIDER_MIN_TERMS, toDesmos, toDesmosSlider } from './export/desmos.ts';
+import { DESMOS_LIST_MAX, SLIDER_MIN_TERMS, toDesmos, toDesmosSlider } from './export/desmos.ts';
 import { copyText, downloadText } from './export/download.ts';
 import { toCoefficientsJson } from './export/json.ts';
 import { toLatex, toLatexPreview } from './export/latex.ts';
@@ -402,13 +402,13 @@ async function copy(text: string): Promise<void> {
 
 $('#copy-desmos').addEventListener('click', () => {
   const { c0, terms, M } = currentTerms();
-  void copy(toDesmos(c0, terms, M));
+  void copy(toDesmos(c0, terms, Math.min(M, DESMOS_LIST_MAX)));
 });
 $('#copy-desmos-slider').addEventListener('click', async () => {
   const { c0, terms, M } = currentTerms();
   // Pasted text cannot set a slider's range: Desmos starts it at -10, so say how to fix it.
   const ok = await copyText(toDesmosSlider(c0, terms, M));
-  const n = Math.min(terms.length, Math.max(M, SLIDER_MIN_TERMS));
+  const n = Math.min(terms.length, DESMOS_LIST_MAX, Math.max(M, SLIDER_MIN_TERMS));
   toast(ok ? t('toast.copiedSlider', { n: String(n) }) : t('toast.copyFailed'), '', ok);
 });
 $('#copy-latex').addEventListener('click', () => {
@@ -698,7 +698,10 @@ function showFormula(s: AppState): void {
   void renderMath($('#formula'), toLatexPreview(c0, terms, M));
   $('#formula-count').textContent = t('formula.count', { n: M });
   const note = $('#desmos-note');
-  const notes = [M > 1000 ? t('desmos.slow') : '', computed.jumpRatio > 0 ? t('desmos.jumps') : ''].filter(Boolean);
+  const notes = [
+    M > DESMOS_LIST_MAX ? t('desmos.limit') : M > 1000 ? t('desmos.slow') : '',
+    computed.jumpRatio > 0 ? t('desmos.jumps') : '',
+  ].filter(Boolean);
   note.hidden = notes.length === 0;
   note.textContent = notes.join(' ');
 }

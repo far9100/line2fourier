@@ -125,6 +125,23 @@ describe('project file (spec §10)', () => {
     expect(b.approx).toEqual(a.approx);
   });
 
+  it('keeps 16384 samples, and says so when an opened drawing comes from an engine that joined its strokes differently', () => {
+    const s = { ...base(), N: 16384 as const, M: 8000 };
+    const parsed = parseProject(projectText(s));
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.project).toMatchObject({ N: 16384, M: 8000, engine: 4 });
+    expect(normalizeState(s)).toBe(s); // in range as it is
+    const file = (engine: number, type: string) => JSON.stringify({
+      format: PROJECT_FORMAT, version: 1, engine, N: 1024, M: 50,
+      source: type === 'random' ? { type, generator: 'star', seed: 1 } : { type, name: 'a.svg', sha256: 'a'.repeat(64) },
+    });
+    const warnings = (text: string) => { const p = parseProject(text); return 'error' in p ? [p.error] : p.warnings; };
+    expect(warnings(file(3, 'svg'))).toEqual(['project.olderEngine']); // strokes were ordered end to end then (D46)
+    expect(warnings(file(4, 'svg'))).toEqual([]);
+    expect(warnings(file(3, 'random'))).toEqual([]); // random drawings are the same in every engine
+    expect(warnings(file(5, 'svg'))).toEqual(['project.newerEngine']);
+  });
+
   it('shows the pen-up moves unless the file says not to (D44)', () => {
     const shown = parseProject(projectText(base()));
     expect('project' in shown && shown.project.view.showJumps).toBe(true);

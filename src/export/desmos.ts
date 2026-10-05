@@ -5,13 +5,17 @@ export { toDesmos };
 
 /** How many terms the slider version carries when M is small, so the slider has room to move. */
 export const SLIDER_MIN_TERMS = 300;
+/** A list in Desmos holds at most this many numbers; a longer one is an error there. */
+export const DESMOS_LIST_MAX = 10_000;
 
 /**
  * The version with a slider: a line M=… and the sums over R[1...M], K[1...M], P[1...M]. The lists
- * hold max(M, 300) terms (all of them if there are fewer), in the current order.
+ * hold max(M, 300) terms (all of them if there are fewer, and never more than Desmos takes), in
+ * the current order.
  */
 export function toDesmosSlider(c0: Term, terms: Term[], M: number, digits = 5): string {
-  const count = Math.min(terms.length, Math.max(M, SLIDER_MIN_TERMS));
+  const count = Math.min(terms.length, DESMOS_LIST_MAX, Math.max(M, SLIDER_MIN_TERMS));
+  M = Math.min(M, count);
   const [R, K, P, curve] = toDesmos(c0, terms, count, digits).split('\n');
   const sliced = curve
     .replace(/R\\cos\(2\\pi Kt\+P\)/, 'R[1...M]\\cos(2\\pi K[1...M]t+P[1...M])')

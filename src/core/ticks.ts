@@ -1,11 +1,11 @@
 // The non-linear scales of the controls (spec §3): circle counts, demo steps, speeds and sample counts.
 
-export const N_CHOICES = [512, 1024, 2048, 4096, 8192] as const;
+export const N_CHOICES = [512, 1024, 2048, 4096, 8192, 16384] as const;
 export type NSize = (typeof N_CHOICES)[number];
 export const DEFAULT_N: NSize = 1024;
 export const DEFAULT_M = 50;
 
-const M_BASE = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 300, 500, 1000, 1500, 2000, 3000, 5000];
+const M_BASE = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 300, 500, 1000, 1500, 2000, 3000, 5000, 8000, 12000];
 
 /** The circle-count ticks for N samples: the spec's scale below N − 1, then N − 1 itself (all circles). */
 export function mTicks(N: number): number[] {
@@ -46,19 +46,23 @@ export const CYCLE_SECONDS = 8;
 
 /**
  * N for an imported drawing: the smallest power of two that puts samples at most 0.01 apart
- * (0.5% of the long side, which is 2 after normalizing), between 1024 and 8192.
- * `length` is the path length in normalized units, jumps included.
+ * (0.5% of the long side, which is 2 after normalizing), between 1024 and the most there is.
+ * `length` is the path length in normalized units, everything the pen does included.
  */
 export function autoN(length: number): NSize {
   for (const N of N_CHOICES) if (N >= 1024 && length / N <= 0.01) return N;
-  return 8192;
+  return N_CHOICES[N_CHOICES.length - 1];
 }
+
+/** The RMS error an opened drawing's circles are picked for: 0.08% of the long side, which is 2 (DECISIONS.md D47). */
+export const FIT_TOLERANCE = 0.0016;
 
 /**
  * M for an imported drawing: the smallest tick whose RMS error, sqrt(dropped[M]) from energyTable,
- * is at most `tol` (default 0.005: a quarter of a percent of the long side, which is 2).
+ * is at most `tol`. At 0.08% of the long side the lines are about a thousandth of the drawing off
+ * at the 95th percentile, under the width of a line; at the 0.25% used before, three times that.
  */
-export function suggestM(dropped: Float64Array, N: number, tol = 0.005): number {
+export function suggestM(dropped: Float64Array, N: number, tol = FIT_TOLERANCE): number {
   for (const M of mTicks(N)) if (Math.sqrt(dropped[M]) <= tol) return M;
   return N - 1;
 }

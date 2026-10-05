@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chainAt, coefficients, orderTerms, partialCurve, resampleClosed, type Pt, type Term } from '../../src/core/fourier.ts';
 import { generate } from '../../src/core/generators.ts';
 import { buildPath, prepareStrokes, samplePath, spansOf } from '../../src/core/path.ts';
-import { SLIDER_MIN_TERMS, toDesmos, toDesmosSlider } from '../../src/export/desmos.ts';
+import { DESMOS_LIST_MAX, SLIDER_MIN_TERMS, toDesmos, toDesmosSlider } from '../../src/export/desmos.ts';
 import { toCoefficientsJson, type CoefficientsFile } from '../../src/export/json.ts';
 import { toLatex, toLatexPreview } from '../../src/export/latex.ts';
 import { toSvg } from '../../src/export/svg.ts';
@@ -43,6 +43,16 @@ describe('Desmos (spec §8)', () => {
     expect(lines[4]).toContain('R[1...M]\\cos(2\\pi K[1...M]t+P[1...M])');
     expect(lines[4]).toContain('R[1...M]\\sin(2\\pi K[1...M]t+P[1...M])');
     expect(lines[1].split(',')).toHaveLength(SLIDER_MIN_TERMS);
+  });
+
+  it('the slider version never carries more than a Desmos list holds', () => {
+    // 16384 samples allow 16383 circles; a list in Desmos stops at 10,000 numbers.
+    const many: Term[] = Array.from({ length: 12_000 }, (_, j) => ({ k: j + 1, re: 1 / (j + 1), im: 0, amp: 1 / (j + 1), phase: 0 }));
+    const lines = toDesmosSlider(c0, many, 11_000).split('\n');
+    expect(DESMOS_LIST_MAX).toBe(10_000);
+    expect(lines[0]).toBe('M=10000');
+    expect(lines[1].split(',')).toHaveLength(10_000);
+    expect(toDesmosSlider(c0, many, 50).split('\n')[1].split(',')).toHaveLength(SLIDER_MIN_TERMS);
   });
 
   it('both versions draw the same curve as the chain, for small and large M', () => {

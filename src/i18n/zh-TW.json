@@ -41,6 +41,7 @@
   "copy.desmosSlider": "複製 Desmos 算式（含 M 滑桿）",
   "copy.latex": "複製 LaTeX",
   "desmos.slow": "圓超過 1000 個時，Desmos 會變慢。",
+  "desmos.limit": "Desmos 的清單最多放 10,000 個數：複製時只取前 10,000 個圓。",
   "toast.copied": "已複製，可以直接貼上。",
   "toast.copiedSlider": "已複製。在 Desmos 裡點滑桿兩端的數字，把範圍改成 1 到 {n}、間隔 1。",
   "toast.copyFailed": "無法寫入剪貼簿。請用 HTTPS 或 localhost 開啟本頁再試一次。",

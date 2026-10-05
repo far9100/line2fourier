@@ -50,6 +50,7 @@
   "copy.desmosSlider": "Copy for Desmos, with an M slider",
   "copy.latex": "Copy LaTeX",
   "desmos.slow": "Above 1000 circles Desmos gets slow.",
+  "desmos.limit": "A list in Desmos holds at most 10,000 numbers: only the first 10,000 circles are copied.",
   "toast.copied": "Copied; ready to paste.",
   "toast.copiedSlider": "Copied. In Desmos, click the numbers at the slider's ends and set it to run from 1 to {n} in steps of 1.",
   "toast.copyFailed": "Could not reach the clipboard. Open this page over HTTPS or from localhost and try again.",

@@ -36,7 +36,7 @@ describe('opening files', () => {
     expect(p.jumpRatio).toBe(buildPath(p.strokes).lengths[JUMP] / buildPath(p.strokes).total);
     const b = strokesBBox(p.strokes);
     expect(Math.max(b.maxX - b.minX, b.maxY - b.minY)).toBeCloseTo(2, 9);
-    expect([1024, 2048, 4096, 8192]).toContain(p.N);
+    expect([1024, 2048, 4096, 8192, 16384]).toContain(p.N);
     expect(p.warnings).toEqual({});
   });
 
