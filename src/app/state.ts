@@ -48,7 +48,8 @@ export interface DemoState {
 }
 
 export interface AppState {
-  source: SourceSpec;
+  /** What is drawn; null once the canvas was cleared, until a line is drawn or a file opened (DECISIONS.md D51). */
+  source: SourceSpec | null;
   N: NSize;
   M: number;
   order: Order;
@@ -66,7 +67,7 @@ export interface AppState {
 
 export const ZOOM_MAX = 50;
 
-export function defaultState(source: SourceSpec, lang: Lang, reducedMotion: boolean): AppState {
+export function defaultState<S extends SourceSpec | null>(source: S, lang: Lang, reducedMotion: boolean): AppState & { source: S } {
   return {
     source,
     N: DEFAULT_N,

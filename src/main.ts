@@ -18,6 +18,7 @@ import { toCoefficientsJson } from './export/json.ts';
 import { toLatex, toLatexPreview } from './export/latex.ts';
 import { toSvg } from './export/svg.ts';
 import { detectLang, setLang, t, type Lang } from './i18n/index.ts';
+import { UNIT_BOX } from './render/camera.ts';
 import { CanvasView } from './render/canvasView.ts';
 import { curveEvents, tipAt, tipSampler } from './render/curve.ts';
 import { buildScene } from './render/scene.ts';
@@ -27,7 +28,7 @@ import { renderMath } from './ui/formula.ts';
 import { startFreehand } from './ui/freehand.ts';
 import { bindKeys } from './ui/keyboard.ts';
 import { mountOutputs } from './ui/outputs.ts';
-import { toast } from './ui/toast.ts';
+import { hideToast, toast } from './ui/toast.ts';
 import { bindViewGestures } from './ui/viewGestures.ts';
 import { createWorkerClient } from './worker/client.ts';
 
@@ -65,6 +66,9 @@ function initialState(): AppState {
 }
 
 const store = createStore(initialState(), normalizeState);
+/** The kind of random drawing the page opened with: a seed typed later gives one of that kind. */
+const opening = store.get().source;
+const openingKind: GeneratorName = opening?.type === 'random' ? opening.generator : 'creature';
 const pipeline = createPipeline();
 const view = new CanvasView($<HTMLCanvasElement>('#view'), () => {
   dirty = true;
@@ -75,7 +79,13 @@ const view = new CanvasView($<HTMLCanvasElement>('#view'), () => {
 const spectrumView = new SpectrumView($<HTMLCanvasElement>('#spectrum'), view.style);
 const worker = createWorkerClient();
 
-let computed: Computed;
+/** The drawing, worked out; null while the canvas is cleared (DECISIONS.md D51). */
+let computed: Computed | null = null;
+/** The drawing, where there has to be one: what is done with it cannot be reached without. */
+function drawn(): Computed {
+  if (!computed) throw new Error('no drawing');
+  return computed;
+}
 let tCycle = 0;
 let firstCycleDone = reducedMotion;
 /** The drawing is done: the pen has been round once and stopped where it started (DECISIONS.md D50). */
@@ -100,10 +110,18 @@ function edgeTip(c: Computed, N = c.N): (t: number) => Pt {
 
 /** Run the pipeline; on a drawing that cannot be used, say why and keep the previous one. */
 function recompute(s: AppState): boolean {
+  if (!s.source) {
+    computed = null;
+    view.scene = null;
+    view.fitTo(UNIT_BOX);
+    timings.recompute = timings.scene = 0;
+    dirty = true;
+    return true;
+  }
   let next: Computed;
   const started = performance.now();
   try {
-    next = pipeline.compute(s);
+    next = pipeline.compute({ source: s.source, N: s.N, M: s.M, order: s.order });
   } catch (e) {
     if (e instanceof PathError) {
       toast(t(`error.path.${e.code}`), 'error');
@@ -148,7 +166,6 @@ function cycleEnded(): void {
   tCycle = WHOLE;
   firstCycleDone = true;
   if (s.demo) store.set({ demo: null, M: s.demo.returnM });
-  else showControls(s);
 }
 
 function frame(now: number): void {
@@ -203,20 +220,22 @@ const mRange = $<HTMLInputElement>('#m-range');
 const mNumber = $<HTMLInputElement>('#m-number');
 const speedRange = $<HTMLInputElement>('#speed');
 const nSelect = $<HTMLSelectElement>('#n-select');
-const generatorSelect = $<HTMLSelectElement>('#generator');
 const seedInput = $<HTMLInputElement>('#seed');
 const fileInput = $<HTMLInputElement>('#file-input');
 
 speedRange.max = String(SPEEDS.length - 1);
 for (const N of N_CHOICES) nSelect.append(new Option(String(N), String(N)));
 
-function newDrawing(generator: GeneratorName, seed = newSeed()): void {
+/** Take the drawing off the canvas: nothing is shown until a line is drawn or a file opened (DECISIONS.md D51). */
+function clearDrawing(): void {
   const s = store.get();
-  store.set({ source: { type: 'random', generator, seed }, mode: 'play', demo: null, M: s.demo ? s.demo.returnM : s.M, selectedK: null });
+  importing++; // a file still being read is not shown when it is ready
+  hideToast(); // nor is anything still said about the drawing that was there
+  draft = null;
+  store.set({ source: null, mode: 'play', demo: null, M: s.demo ? s.demo.returnM : s.M, selectedK: null });
 }
 
-$('#new-drawing').addEventListener('click', () => newDrawing(generatorSelect.value as GeneratorName));
-generatorSelect.addEventListener('change', () => newDrawing(generatorSelect.value as GeneratorName));
+$('#clear').addEventListener('click', clearDrawing);
 $('#seed-apply').addEventListener('click', applySeed);
 seedInput.addEventListener('keydown', e => { if (e.key === 'Enter') applySeed(); });
 
@@ -227,29 +246,35 @@ function applySeed(): void {
     toast(t('seed.invalid'), 'error');
     return;
   }
-  newDrawing(generatorSelect.value as GeneratorName, seed);
+  // A random drawing of the kind on the canvas, or of the kind the page opened with.
+  const s = store.get();
+  const generator = s.source?.type === 'random' ? s.source.generator : openingKind;
+  store.set({ source: { type: 'random', generator, seed }, mode: 'play', demo: null, M: s.demo ? s.demo.returnM : s.M, selectedK: null });
 }
 
 $('#draw').addEventListener('click', () => enterDraw());
 $('#draw-cancel').addEventListener('click', () => leaveDraw());
-$('#play').addEventListener('click', togglePlay);
+$('#replay').addEventListener('click', replay);
 $('#demo').addEventListener('click', toggleDemo);
 
-/** Play and pause; once the drawing is done, draw it again from the start. */
-function togglePlay(): void {
-  const s = store.get();
-  if (!finished) {
-    store.set({ playing: !s.playing });
-    return;
-  }
+/** Draw the line again from the start, whether it is done, under way or paused. */
+function replay(): void {
+  if (!computed) return;
   rewind();
   dirty = true;
-  if (s.playing) showControls(s);
-  else store.set({ playing: true });
+  if (!store.get().playing) store.set({ playing: true });
+}
+
+/** The Space key: pause and go on; once the drawing is done, draw it again. */
+function togglePlay(): void {
+  if (!computed) return;
+  if (finished) replay();
+  else store.set({ playing: !store.get().playing });
 }
 
 function toggleDemo(): void {
   const s = store.get();
+  if (!computed) return;
   if (s.demo) {
     store.set({ demo: null, M: s.demo.returnM });
     return;
@@ -361,7 +386,7 @@ spectrumView.canvas.addEventListener('click', e => {
   store.set({ selectedK: k === store.get().selectedK ? null : k });
 });
 spectrumView.canvas.addEventListener('keydown', e => {
-  const s = store.get(), K = spectrumK(s);
+  const s = store.get(), K = spectrumK(s, drawn());
   const step = (k: number, dir: number) => { let next = k + dir; if (next === 0) next += dir; return Math.max(-K, Math.min(K, next)); };
   let next: number | null | undefined;
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') next = step(s.selectedK ?? 0, e.key === 'ArrowRight' ? 1 : -1);
@@ -419,8 +444,8 @@ function setDrawing(on: boolean): void {
 // ---------------------------------------------------------------- export
 
 function currentTerms() {
-  const { c0, terms } = computed.ordered;
-  return { c0, terms, M: computed.M };
+  const c = drawn();
+  return { c0: c.ordered.c0, terms: c.ordered.terms, M: c.M };
 }
 
 async function copy(text: string): Promise<void> {
@@ -443,9 +468,10 @@ $('#copy-latex').addEventListener('click', () => {
   void copy(toLatex(c0, terms, M));
 });
 $('#download-json').addEventListener('click', () => {
-  const s = store.get();
+  const s = store.get(), c = drawn();
+  if (!s.source) return;
   // The source as a project names it: an opened file by name and hash, not its contents and every piece of the walk.
-  const text = toCoefficientsJson(computed.spectrum, computed.ordered.terms, { M: computed.M, order: s.order, source: savedSource(s.source, false) });
+  const text = toCoefficientsJson(c.spectrum, c.ordered.terms, { M: c.M, order: s.order, source: savedSource(s.source, false) });
   downloadText(text, 'line2fourier-coefficients.json', 'application/json');
 });
 $('#download-svg').addEventListener('click', () => {
@@ -456,12 +482,14 @@ $('#download-svg').addEventListener('click', () => {
     return;
   }
   // Sample the curve at least 8192 times (exact trigonometric interpolation): smoother than N points when N is less.
+  const c = drawn();
   const { c0, terms, M } = currentTerms();
-  const fine = partialCurve(c0, terms, M, Math.max(computed.N, 8192));
-  const events = curveEvents(fine, computed.spans, edgeTip(computed, fine.length), computed.path.fillWidth);
+  const fine = partialCurve(c0, terms, M, Math.max(c.N, 8192));
+  const events = curveEvents(fine, c.spans, edgeTip(c, fine.length), c.path.fillWidth);
   downloadText(toSvg(events, { widthMm, strokeMm }), 'line2fourier.svg', 'image/svg+xml');
 });
 $('#project-save').addEventListener('click', () => {
+  if (!store.get().source) return;
   const embed = $<HTMLInputElement>('#embed-source').checked;
   downloadText(projectText(store.get(), embed), 'line2fourier-project.json', 'application/json');
 });
@@ -644,10 +672,14 @@ const GENERATOR_KEYS: Record<GeneratorName, string> = { creature: 'gen.creature'
 let formulaFor: { ordered: Ordered; M: number; lang: Lang } | null = null;
 
 function showControls(s: AppState): void {
-  const playKey = finished ? 'ctrl.replay' : s.playing ? 'ctrl.pause' : 'ctrl.play';
-  $('#play').setAttribute('aria-pressed', String(s.playing && !finished));
-  $('#play-label').dataset.i18n = playKey;
-  $('#play-label').textContent = t(playKey);
+  // With the canvas cleared there is nothing to clear, to replay, to measure or to save (DECISIONS.md D51).
+  const none = !s.source, drawing = s.mode === 'draw';
+  $<HTMLButtonElement>('#clear').disabled = none && !drawing;
+  $<HTMLButtonElement>('#replay').disabled = none || drawing;
+  $<HTMLButtonElement>('#demo').disabled = none;
+  $<HTMLButtonElement>('#project-save').disabled = none;
+  $('#empty-hint').hidden = !none || drawing;
+  $('.app').classList.toggle('no-drawing', none);
   $('#demo').setAttribute('aria-pressed', String(!!s.demo));
   $('#draw').setAttribute('aria-pressed', String(s.mode === 'draw'));
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === s.lang));
@@ -667,20 +699,19 @@ function showControls(s: AppState): void {
   $<HTMLInputElement>('#show-jumps').checked = s.view.showJumps;
   $<HTMLInputElement>('#follow').checked = s.view.follow;
   nSelect.value = String(s.N);
-  if (s.source.type === 'random') {
-    generatorSelect.value = s.source.generator;
-    if (document.activeElement !== seedInput) seedInput.value = String(s.source.seed);
-  }
-  $('#embed-row').hidden = s.source.type === 'random' || s.source.type === 'freehand';
-
   const src = s.source;
-  const status = src.type === 'random'
-    ? t('status.random', { M: String(s.M), N: String(s.N), kind: t(GENERATOR_KEYS[src.generator]), seed: String(src.seed) })
-    : src.type === 'freehand'
-      ? t('status.freehand', { M: String(s.M), N: String(s.N) })
-      : t('status.import', { kind: t(`kind.${src.type}`), name: src.name, strokes: src.strokeCount, M: String(s.M), N: String(s.N) });
+  if (src?.type === 'random' && document.activeElement !== seedInput) seedInput.value = String(src.seed);
+  $('#embed-row').hidden = !src || src.type === 'random' || src.type === 'freehand';
+
+  const status = !src
+    ? t('status.empty')
+    : src.type === 'random'
+      ? t('status.random', { M: String(s.M), N: String(s.N), kind: t(GENERATOR_KEYS[src.generator]), seed: String(src.seed) })
+      : src.type === 'freehand'
+        ? t('status.freehand', { M: String(s.M), N: String(s.N) })
+        : t('status.import', { kind: t(`kind.${src.type}`), name: src.name, strokes: src.strokeCount, M: String(s.M), N: String(s.N) });
   $('#status').textContent = s.demo ? `${status} · ${t('status.demo', { step: s.demo.step + 1, steps: demoSequence(s.N).length })}` : status;
-  view.canvas.setAttribute('aria-label', t('canvas.label', { n: s.M }));
+  view.canvas.setAttribute('aria-label', src ? t('canvas.label', { n: s.M }) : t('canvas.empty'));
 }
 
 function showMetrics(): void {
@@ -690,23 +721,23 @@ function showMetrics(): void {
   // Spec §4.6: the share of the path that is pen-up jumps, against the file's own order.
   const src = store.get().source;
   $('#metric-jumps-row').hidden = c.jumpRatio === 0;
-  $('#metric-jumps').textContent = src.type !== 'random' && src.type !== 'freehand'
+  $('#metric-jumps').textContent = src && src.type !== 'random' && src.type !== 'freehand'
     ? t('metrics.jumpsValue', { p: formatShare(c.jumpRatio, 1), q: formatShare(src.originalJumpRatio, 1) })
     : formatShare(c.jumpRatio, 1);
 }
 
 /** The k range of the spectrum panel: every term in use, unless a range was picked. */
-function spectrumK(s: AppState): number {
+function spectrumK(s: AppState, drawing: Computed): number {
   const v = spectrumRange.value;
   if (v === 'all') return s.N / 2;
   if (v !== 'auto') return Math.min(Number(v), s.N / 2);
-  return autoRange(new Set(computed.ordered.terms.slice(0, computed.M).map(c => c.k)), s.N);
+  return autoRange(new Set(drawing.ordered.terms.slice(0, drawing.M).map(c => c.k)), s.N);
 }
 
 function showSpectrum(s: AppState): void {
   if (!computed) return;
   const used = new Set(computed.ordered.terms.slice(0, computed.M).map(c => c.k));
-  spectrumView.set({ spectrum: computed.spectrum, used, selected: s.selectedK, K: spectrumK(s) });
+  spectrumView.set({ spectrum: computed.spectrum, used, selected: s.selectedK, K: spectrumK(s, computed) });
   const readout = $('#spectrum-readout');
   const c = s.selectedK === null ? undefined : computed.spectrum.find(x => x.k === s.selectedK);
   if (!c) {
@@ -773,56 +804,65 @@ Object.defineProperty(window, '__l2f', {
     debug() {
       const s = store.get();
       const cam = view.lastCamera ?? view.freeCamera();
-      const joints = view.scene?.joints;
-      const circles = computed.ordered.terms.slice(0, computed.M).map((c, j) => ({
-        k: c.k,
-        r: c.amp * cam.s,
-        x: joints ? cam.ox + cam.s * (joints[2 * j] - cam.cx) : NaN,
-        y: joints ? cam.oy - cam.s * (joints[2 * j + 1] - cam.cy) : NaN,
-      }));
-      return {
+      const src = s.source;
+      const base = {
         state: {
           ...s,
-          source: s.source.type === 'random' ? s.source
-            : s.source.type === 'freehand' ? { type: s.source.type, points: s.source.points.length }
-              : { type: s.source.type, name: s.source.name, sha256: s.source.sha256, strokes: s.source.strokeCount, originalJumpRatio: s.source.originalJumpRatio },
+          source: !src ? null
+            : src.type === 'random' ? src
+              : src.type === 'freehand' ? { type: src.type, points: src.points.length }
+                : { type: src.type, name: src.name, sha256: src.sha256, strokes: src.strokeCount, originalJumpRatio: src.originalJumpRatio },
         },
+        /** The canvas is cleared (DECISIONS.md D51): what describes a drawing is then left out. */
+        empty: !computed,
         t: tCycle,
         firstCycleDone,
         finished,
-        M: computed.M,
-        N: computed.N,
-        size: computed.size,
-        metrics: computed.metrics,
-        jumpRatio: computed.jumpRatio,
-        used: computed.ordered.terms.slice(0, computed.M).map(c => c.k),
-        /** The drawing's strokes; an opened drawing is walked in more pieces than that (DECISIONS.md D46). */
-        strokes: s.source.type === 'random' || s.source.type === 'freehand' ? computed.strokes.length : s.source.strokeCount,
-        pieces: computed.strokes.length,
-        /** Lengths of the path by kind: 0 ink, 1 closure, 2 jump, 3 fill, 4 walked again. */
-        lengths: Array.from(computed.path.lengths),
-        highlight: view.last?.highlight
-          ? { x: cam.ox + cam.s * (view.last.highlight.x - cam.cx), y: cam.oy - cam.s * (view.last.highlight.y - cam.cy), r: view.last.highlight.r * cam.s, j: view.last.highlight.j }
-          : null,
-        spectrumK: spectrumK(s),
-        fillWidth: computed.path.fillWidth,
         /** The free view's zoom (1: the whole drawing) and the scale in pixels per world unit. */
         viewZoom: view.zoom,
         scale: cam.s,
         camera: { ...cam },
+        frame: view.last,
+        calls: { ...pipeline.calls },
+        timings: { ...timings },
+      };
+      const c = computed;
+      if (!c || !src) return base;
+      const joints = view.scene?.joints;
+      const circles = c.ordered.terms.slice(0, c.M).map((term, j) => ({
+        k: term.k,
+        r: term.amp * cam.s,
+        x: joints ? cam.ox + cam.s * (joints[2 * j] - cam.cx) : NaN,
+        y: joints ? cam.oy - cam.s * (joints[2 * j + 1] - cam.cy) : NaN,
+      }));
+      return {
+        ...base,
+        M: c.M,
+        N: c.N,
+        size: c.size,
+        metrics: c.metrics,
+        jumpRatio: c.jumpRatio,
+        used: c.ordered.terms.slice(0, c.M).map(term => term.k),
+        /** The drawing's strokes; an opened drawing is walked in more pieces than that (DECISIONS.md D46). */
+        strokes: src.type === 'random' || src.type === 'freehand' ? c.strokes.length : src.strokeCount,
+        pieces: c.strokes.length,
+        /** Lengths of the path by kind: 0 ink, 1 closure, 2 jump, 3 fill, 4 walked again. */
+        lengths: Array.from(c.path.lengths),
+        highlight: view.last?.highlight
+          ? { x: cam.ox + cam.s * (view.last.highlight.x - cam.cx), y: cam.oy - cam.s * (view.last.highlight.y - cam.cy), r: view.last.highlight.r * cam.s, j: view.last.highlight.j }
+          : null,
+        spectrumK: spectrumK(s, c),
+        fillWidth: c.path.fillWidth,
         /** Midpoints of the original path's segments of each kind, on screen (0 ink, 1 closure, 2 jump, 3 fill, 4 walked again). */
-        mids: (kind: number) => Array.from(computed.path.kinds).flatMap((k, i) => {
+        mids: (kind: number) => Array.from(c.path.kinds).flatMap((k, i) => {
           if (k !== kind) return [];
-          const a = computed.path.poly[i], b = computed.path.poly[(i + 1) % computed.path.poly.length];
+          const a = c.path.poly[i], b = c.path.poly[(i + 1) % c.path.poly.length];
           return [[cam.ox + cam.s * ((a[0] + b[0]) / 2 - cam.cx), cam.oy - cam.s * ((a[1] + b[1]) / 2 - cam.cy)]];
         }),
         tipScreen: view.last ? [cam.ox + cam.s * (view.last.tip[0] - cam.cx), cam.oy - cam.s * (view.last.tip[1] - cam.cy)] : null,
         spectrumUsed: [...(spectrumView.input?.used ?? [])],
         spectrumX: (k: number) => spectrumView.clientXOf(k),
         circles,
-        frame: view.last,
-        calls: { ...pipeline.calls },
-        timings: { ...timings },
       };
     },
   }),

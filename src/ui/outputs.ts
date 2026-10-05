@@ -18,7 +18,8 @@ import { toast } from './toast.ts';
 
 export interface OutputDeps {
   state(): Readonly<AppState>;
-  computed(): Computed;
+  /** The drawing, worked out; null while the canvas is cleared. */
+  computed(): Computed | null;
   scene(): Scene | null;
   style(): Style;
 }
@@ -77,8 +78,10 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
   let staticDrawn = false;
   const xs = new Float32Array(2048), ys = new Float32Array(2048);
 
-  const currentPeriod = (): Period => {
+  /** One period of the drawing as sound; null while there is no drawing. */
+  const currentPeriod = (): Period | null => {
     const c = deps.computed(), f0 = Number(f0Select.value);
+    if (!c) return null;
     if (!period || !periodFor || periodFor.ordered !== c.ordered || periodFor.M !== c.M || periodFor.f0 !== f0) {
       period = synthesizePeriod(c.ordered.terms, c.M, f0);
       periodFor = { ordered: c.ordered, M: c.M, f0 };
@@ -90,6 +93,7 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
 
   const showNote = () => {
     const p = currentPeriod(), f0 = Number(f0Select.value);
+    if (!p) return;
     $('#scope-note').textContent = p.dropped > 0
       ? t('scope.note', { kept: p.kept, dropped: p.dropped, nyquist: String(SAMPLE_RATE / 2), energy: pct(p.droppedEnergy) })
       : t('scope.noteAll', { kept: p.kept, max: String(Math.floor((SAMPLE_RATE / 2 - 1) / f0)) });
@@ -107,7 +111,8 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
       player.stop();
       staticDrawn = false;
     } else {
-      await player.play(currentPeriod(), Number(volume.value) / 100);
+      const p = currentPeriod();
+      if (p) await player.play(p, Number(volume.value) / 100);
     }
     setPlaying(player.playing);
   });
@@ -116,6 +121,7 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
 
   $('#wav-export').addEventListener('click', () => {
     const p = currentPeriod(), f0 = Number(f0Select.value);
+    if (!p) return;
     const wav = encodeWav(p.x, p.y, WAV_SECONDS * f0);
     downloadBlob(new Blob([wav], { type: 'audio/wav' }), `line2fourier-${f0}Hz.wav`);
   });
@@ -174,11 +180,16 @@ export function mountOutputs(deps: OutputDeps): { frame(): void; update(): void 
         staticDrawn = false;
       } else if (!staticDrawn) {
         const p = currentPeriod();
-        drawXY(xy, p.x, p.y, colors);
+        if (p) drawXY(xy, p.x, p.y, colors);
         staticDrawn = true;
       }
     },
     update() {
+      // The canvas was cleared: its sound stops with it.
+      if (!deps.computed() && player.playing) {
+        player.stop();
+        setPlaying(false);
+      }
       currentPeriod();
       showNote();
       staticDrawn = false;

@@ -179,10 +179,10 @@ test('a project with the SVG embedded opens without asking; without it, the file
   expect(JSON.parse(embedded).source).toMatchObject({ type: 'svg', name: 'four-shapes.svg' });
   expect(JSON.parse(embedded).source.content).toContain('<svg');
 
-  await page.locator('#new-drawing').click();
+  await page.locator('#clear').click();
   let [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#project-open').click()]);
   await chooser.setFiles({ name: 'p.json', mimeType: 'application/json', buffer: Buffer.from(embedded) });
-  await expect.poll(async () => (await debug(page)).state.source.type).toBe('svg');
+  await expect.poll(async () => (await debug(page)).state.source?.type).toBe('svg'); // null while it is cleared
   let after = await debug(page);
   expect(after.M).toBe(40);
   expect(after.metrics).toEqual(before.metrics);
@@ -190,15 +190,43 @@ test('a project with the SVG embedded opens without asking; without it, the file
   // Without the content: the project asks for the file, then keeps its own M.
   const bare = JSON.parse(embedded);
   delete bare.source.content;
-  await page.locator('#new-drawing').click();
+  await page.locator('#clear').click();
   [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#project-open').click()]);
   await chooser.setFiles({ name: 'p.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(bare)) });
   await expect(page.locator('#toast')).toContainText('four-shapes.svg');
-  expect((await debug(page)).state.source.type).toBe('random');
+  expect((await debug(page)).empty).toBe(true); // still cleared: the project waits for its file
   await upload(page, 'four-shapes.svg');
   after = await debug(page);
   expect(after.M).toBe(40);
   expect(after.metrics).toEqual(before.metrics);
+});
+
+test('Clear while a picture is still being read: it is not shown when it is ready (D51)', async ({ page }) => {
+  await open(page, 'play=0');
+  // A picture that takes a moment: 144 rings, 1000 px across, made by the page's own canvas.
+  const png = await page.evaluate(async () => {
+    const c = document.createElement('canvas');
+    c.width = 1000; c.height = 1000;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1000, 1000);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+    for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) { ctx.beginPath(); ctx.arc(60 + 80 * i, 60 + 80 * j, 30, 0, 2 * Math.PI); ctx.stroke(); }
+    const blob = await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/png'));
+    return Array.from(new Uint8Array(await blob.arrayBuffer()));
+  });
+  const before = (await debug(page)).calls;
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#upload').click()]);
+  await chooser.setFiles({ name: 'rings.png', mimeType: 'image/png', buffer: Buffer.from(png) });
+  await expect(page.locator('#toast')).toContainText('正在讀取線稿');
+  await page.locator('#clear').click();
+  await expect(page.locator('#toast')).toBeHidden(); // nothing more is said about it
+  // Given all the time it needs, the picture stays away: nothing was ever worked out for it.
+  await page.waitForTimeout(3000);
+  const d = await debug(page);
+  expect(d.empty).toBe(true);
+  expect(d.calls).toEqual(before);
+  await expect(page.locator('#toast')).toBeHidden();
+  await expect(page.locator('#empty-hint')).toBeVisible();
 });
 
 test('a picture with a solid area: outlined, painted in with the wide pen, and said so (D42)', async ({ page }) => {

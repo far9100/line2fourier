@@ -5,7 +5,7 @@
 import type { Order, Pt } from '../core/fourier.ts';
 import { GENERATORS, type GeneratorName } from '../core/generators.ts';
 import { N_CHOICES, SPEEDS, type NSize } from '../core/ticks.ts';
-import { ZOOM_MAX, type AppState, type ImportKind, type ViewState } from './state.ts';
+import { ZOOM_MAX, type AppState, type ImportKind, type SourceSpec, type ViewState } from './state.ts';
 
 export const PROJECT_FORMAT = 'line2fourier.project';
 /**
@@ -36,12 +36,14 @@ export interface ProjectFile {
   view: ViewState;
 }
 
-export function savedSource(s: AppState['source'], embed: boolean): SavedSource {
+export function savedSource(s: SourceSpec, embed: boolean): SavedSource {
   if (s.type === 'random' || s.type === 'freehand') return s;
   return embed ? { type: s.type, name: s.name, sha256: s.sha256, content: s.content } : { type: s.type, name: s.name, sha256: s.sha256 };
 }
 
+/** Throws when there is no drawing: a cleared canvas is not a project. */
 export function toProject(s: AppState, embed = false): ProjectFile {
+  if (!s.source) throw new Error('no drawing to save');
   return {
     format: PROJECT_FORMAT,
     version: 1,

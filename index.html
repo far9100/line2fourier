@@ -14,18 +14,10 @@
     <header class="top">
       <h1 class="brand-name">line2fourier</h1>
       <div class="bar" role="toolbar" aria-label="Drawing controls" data-i18n-aria-label="bar.label">
-        <div class="joined">
-          <button type="button" id="new-drawing" data-i18n="ctrl.newDrawing">New drawing</button>
-          <label class="visually-hidden" for="generator" data-i18n="ctrl.generator">Kind of drawing</label>
-          <select id="generator">
-            <option value="creature" data-i18n="gen.creature">Creature</option>
-            <option value="scribble" data-i18n="gen.scribble">Scribble</option>
-            <option value="star" data-i18n="gen.star">Spiky star</option>
-          </select>
-        </div>
+        <button type="button" id="clear" data-i18n="ctrl.clear">Clear</button>
         <button type="button" id="draw" data-i18n="ctrl.draw">Draw your own</button>
-        <button type="button" id="upload" data-i18n="ctrl.upload" data-i18n-title="ctrl.uploadTitle">Open a drawing</button>
-        <button type="button" id="play" class="play primary" aria-pressed="false"><span id="play-label" data-i18n="ctrl.play">Play</span></button>
+        <button type="button" id="upload" data-i18n="ctrl.upload" data-i18n-title="ctrl.uploadTitle">Upload image</button>
+        <button type="button" id="replay" class="primary" data-i18n="ctrl.replay">Replay</button>
       </div>
       <div class="top-actions">
         <button type="button" class="quiet" id="about-open" data-i18n="about.open">How it works</button>
@@ -45,6 +37,7 @@
             <p data-i18n="draw.hint">Press and drag to draw one line; let go to finish.</p>
             <button type="button" id="draw-cancel" data-i18n="draw.cancel">Cancel</button>
           </div>
+          <p class="empty-hint" id="empty-hint" data-i18n="empty.hint" hidden>Nothing here yet: draw a line, or open a picture of one.</p>
           <p class="status" id="status"></p>
           <div class="view-tools" role="group" aria-label="View" data-i18n-aria-label="view.tools">
             <button type="button" id="view-zoom-out" aria-label="Zoom out" data-i18n-aria-label="view.zoomOut" data-i18n-title="view.zoomOut">−</button>
@@ -91,7 +84,7 @@
           </div>
         </section>
 
-        <section class="group" aria-labelledby="metrics-title">
+        <section class="group needs-drawing" aria-labelledby="metrics-title">
           <h2 id="metrics-title" data-i18n="metrics.title">How close</h2>
           <dl class="metrics">
             <div><dt data-i18n="metrics.rms">RMS error</dt><dd id="metric-rms"></dd></div>
@@ -100,7 +93,7 @@
           <p class="note" data-i18n="metrics.note">Errors are shares of the drawing's size. More circles, closer fit.</p>
         </section>
 
-        <details class="group" id="spectrum-section">
+        <details class="group needs-drawing" id="spectrum-section">
           <summary id="spectrum-title" data-i18n="spectrum.title">Spectrum</summary>
           <label class="spectrum-range"><span data-i18n="spectrum.range">Range</span>
             <select id="spectrum-range">
@@ -119,6 +112,7 @@
 
         <details class="group" id="export-section">
           <summary id="export-title" data-i18n="export.title">Formula and files</summary>
+          <div class="needs-drawing">
           <h3 class="sub" data-i18n="formula.title">The series</h3>
           <div class="formula" id="formula" aria-live="off"></div>
           <p class="note" id="formula-count"></p>
@@ -137,6 +131,7 @@
             <label><span data-i18n="export.svgStroke">Line (mm)</span><input type="number" id="svg-stroke" min="0.05" max="10" step="0.05" value="0.3"></label>
             <button type="button" id="download-svg" data-i18n="export.svg">Download SVG</button>
           </div>
+          </div>
           <div class="buttons">
             <button type="button" id="project-save" data-i18n="project.save">Save project</button>
             <button type="button" id="project-open" data-i18n="project.open">Open project</button>
@@ -144,7 +139,7 @@
           <label class="embed" id="embed-row" hidden><input type="checkbox" id="embed-source"><span data-i18n="project.embed">Include the source file</span></label>
         </details>
 
-        <details class="group" id="outputs-section">
+        <details class="group needs-drawing" id="outputs-section">
           <summary id="outputs-title" data-i18n="outputs.title">Make something</summary>
           <div class="buttons">
             <button type="button" id="video-export" data-i18n="video.export">Video of one cycle</button>

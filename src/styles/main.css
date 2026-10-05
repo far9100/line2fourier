@@ -117,10 +117,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--select); }
 .top-actions { grid-area: actions; }
 .brand-name { font-size: 16px; letter-spacing: 0.01em; }
 .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
-.joined { display: flex; }
-.joined button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.joined select { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 0; }
-.play { min-width: 74px; }
 .top-actions { display: flex; align-items: center; gap: 6px; }
 .lang { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
 .lang button { border: 0; border-radius: 0; background: transparent; padding: 4px 9px; color: var(--muted); }
@@ -158,6 +154,23 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--select); }
 .draw-overlay p { margin: 0; color: var(--muted); }
 .draw-overlay button { pointer-events: auto; }
 .draw-overlay[hidden] { display: none; }
+
+/* The cleared canvas says what can be put on it. */
+.empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 28px;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+.empty-hint[hidden] { display: none; }
+/* With the canvas cleared, what measures or exports a drawing is put away. */
+.no-drawing .needs-drawing { display: none; }
 
 .status {
   position: absolute;
@@ -331,8 +344,7 @@ dialog h3 { font-size: 15px; margin: 16px 0 4px; }
 @media (max-width: 520px) {
   .top { padding: 6px 8px; gap: 6px 8px; }
   .bar { gap: 4px; }
-  .bar button, .bar select { padding: 5px 7px; }
-  .play { min-width: 0; }
+  .bar button { padding: 5px 7px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

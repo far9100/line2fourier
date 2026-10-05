@@ -43,6 +43,8 @@ export interface Debug {
     view: { showCircles: boolean; showOriginal: boolean; showJumps: boolean; follow: boolean; zoom: number };
     source: { type: string; generator?: string; seed?: number; points?: number; name?: string; strokes?: number };
   };
+  /** The canvas is cleared (DECISIONS.md D51): state.source is then null, and what follows `timings` is missing. */
+  empty: boolean;
   t: number;
   firstCycleDone: boolean;
   /** The pen has been round once and stopped where it started (DECISIONS.md D50). */

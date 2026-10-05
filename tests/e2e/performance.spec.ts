@@ -6,9 +6,13 @@ import { debug, expect, open, test } from './fixtures.ts';
 test('recomputing at N = 1024 takes under 10 ms', async ({ page }) => {
   await open(page, 'gen=creature&seed=1&play=0');
   const times: number[] = [];
-  for (const gen of ['star', 'scribble', 'creature', 'star', 'scribble']) {
-    await page.locator('#generator').selectOption(gen);
-    times.push((await debug(page)).timings.recompute);
+  await page.locator('#advanced-title').click();
+  for (const seed of [2, 3, 4, 5, 6]) {
+    await page.locator('#seed').fill(String(seed));
+    await page.locator('#seed-apply').click();
+    const d = await debug(page);
+    expect(d.state.source.seed).toBe(seed);
+    times.push(d.timings.recompute);
   }
   times.sort((a, b) => a - b);
   expect(times[Math.floor(times.length / 2)]).toBeLessThan(10);

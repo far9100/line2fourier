@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { advance, cycleMs, MAX_FRAME_MS } from '../../src/app/clock.ts';
 import { createPipeline } from '../../src/app/pipeline.ts';
 import { PROJECT_FORMAT, parseProject, projectText, toProject } from '../../src/app/project.ts';
-import { defaultState, normalizeState, type AppState } from '../../src/app/state.ts';
+import { defaultState, normalizeState, type AppState, type SourceSpec } from '../../src/app/state.ts';
 import { createStore } from '../../src/app/store.ts';
 import { PathError } from '../../src/core/path.ts';
 
-const base = (): AppState => defaultState({ type: 'random', generator: 'creature', seed: 42 }, 'zh-TW', false);
+const base = (): AppState & { source: SourceSpec } => defaultState<SourceSpec>({ type: 'random', generator: 'creature', seed: 42 }, 'zh-TW', false);
 
 describe('pipeline: only what changed is recomputed', () => {
   it('M touches the approximation and the metrics only', () => {

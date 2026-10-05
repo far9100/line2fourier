@@ -1,4 +1,4 @@
-// Keys (spec §6): Space plays and pauses, ← / → change the number of circles (Shift: by one), D starts
+// Keys (spec §6): Space pauses and goes on (and replays a finished drawing), ← / → change the number of circles (Shift: by one), D starts
 // drawing, Esc cancels drawing or the demo, Ctrl/⌘+O opens a file; + / − zoom, 0 shows the whole
 // drawing, F goes full screen (DECISIONS.md D45).
 

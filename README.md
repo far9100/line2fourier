@@ -53,16 +53,20 @@ npm run bench      # how long the maths takes (spec §6)
   canvas alone on the screen. The line is drawn black (white on a dark screen) and the pen-up moves
   grey. The panel keeps the circles, what to show and how close the fit is in view; the spectrum,
   the formula and files, the video, flipbook and sound, and the rarer settings fold away.
+- **Four buttons**: **Clear**, **Draw your own**, **Upload image** and **Replay**.
 - **A drawing is drawn once.** When the pen is back where it started it stops, with the whole line
-  on screen, and the Play button reads **Replay**: press it (or Space) to draw the line again.
-  While it is stopped, changing the number of circles shows the whole of the new curve at once.
-- **New drawing** makes a random creature, scribble or spiky star; the menu next to it picks the
-  kind. The seed is shown under **More settings**, where you can also type one to get a drawing
-  back.
+  on screen. **Replay** draws the line again from the start, at any time; Space pauses and goes
+  on, and replays a finished drawing. While it is stopped, changing the number of circles shows
+  the whole of the new curve at once.
+- **Clear** takes the drawing off the canvas, which then says what can be put on it. What measures
+  or exports a drawing is put away until there is one again.
+- **The page opens with a random creature.** Its seed is shown under **More settings**, where you
+  can also type one to get a drawing back. The address takes `?gen=creature`, `scribble` or `star`
+  and `&seed=…`.
 - **Draw your own**: press and drag on the canvas, with a mouse, a finger or a pen, and let go. The
   line is closed with a straight segment, shown dashed.
-- **Open a drawing** takes an SVG file, line2func's `curves.json` or a picture of line art (PNG,
-  JPEG, …; you can also drop a file on the page or paste one). A picture is thinned to
+- **Upload image** takes a picture of line art (PNG, JPEG, …), an SVG file or line2func's
+  `curves.json` (you can also drop a file on the page or paste one). A picture is thinned to
   one-pixel lines and traced, with areas of solid ink outlined and painted in; for photos and
   pencil sketches, trace them with line2func first and open its `curves.json`. Solid areas, and
   line2func's filled areas, are painted ring by ring with a pen wider than the rings are apart,
@@ -88,7 +92,7 @@ npm run bench      # how long the maths takes (spec §6)
   the box next to it takes any whole number.
 - **By size** (under **More settings**) uses the largest circles first: for any number of circles
   that is the closest fit there is. **By frequency** uses the slowest first, like a low-pass filter.
-- Keys: Space plays and pauses (and replays a finished drawing); ← and → change the number of circles (with Shift, one at a time);
+- Keys: Space pauses and goes on (and replays a finished drawing); ← and → change the number of circles (with Shift, one at a time);
   + and − zoom, 0 shows the whole drawing, F goes full screen; D starts drawing; Esc cancels
   drawing or the demo.
 
@@ -197,17 +201,19 @@ npm run bench      # 量測數學運算的耗時（規格 §6）
 ### 用瀏覽器
 
 - **整頁就是一個畫面。** 線稿佔滿右側窄面板以外的空間，並自動縮放到剛好放得下。在畫面上用滾輪（或兩指）以游標為中心縮放、拖曳移動，點兩下或按 0 回到整張，按全螢幕鈕（或 F）只留下畫布。線畫成黑色（深色畫面是白色），跳線是灰色。面板上隨時看得到圓、顯示選項與逼近程度；頻譜、算式與匯出、實體輸出和較少用的設定則收起來，要用時再展開。
-- **線稿只畫一次。** 筆尖回到起點就停下來，整條線留在畫面上，播放鈕變成〔重播〕：按它（或空白鍵）再畫一次。停著的時候改圓的數量，會直接看到整條新的曲線。
-- 〔換一張線稿〕隨機產生小怪獸、塗鴉或尖角星形，旁邊的選單可以指定類型。〔更多設定〕裡會顯示種子，也可以輸入種子，畫出同一張線稿。
+- **上方四個按鍵**：〔清除〕、〔自己畫〕、〔上傳圖片〕、〔重播〕。
+- **線稿只畫一次。** 筆尖回到起點就停下來，整條線留在畫面上。按〔重播〕隨時可以從頭再畫一次；空白鍵可以暫停與繼續，畫完後則是重播。停著的時候改圓的數量，會直接看到整條新的曲線。
+- 〔清除〕把線稿從畫布拿掉，空的畫布會提示可以放什麼上去。量測與匯出線稿的東西會先收起來，等有線稿再出現。
+- **頁面一開是一張隨機的小怪獸。**〔更多設定〕裡會顯示它的種子，也可以輸入種子，畫出同一張線稿。網址加上 `?gen=creature`、`scribble` 或 `star`，以及 `&seed=…`，可以指定類型與種子。
 - 〔自己畫〕：用滑鼠、手指或觸控筆在畫布上按住拖曳，放開就完成。線會用一段直線自動閉合，以虛線標示。
-- 〔上傳線稿〕可以開啟 SVG 檔、line2func 的 `curves.json` 或線稿圖片（PNG、JPEG 等；也可以直接把檔案拖進頁面或貼上）。圖片會先細線化成一像素寬，再追蹤成線條，塗黑的區域則描外框並塗滿；照片和鉛筆稿請先用 line2func 描線，再開啟它的 `curves.json`。塗黑的區域（以及 line2func 的填色區）會用比圈距寬的筆一圈圈塗滿，畫出來是實心的。
+- 〔上傳圖片〕可以開啟線稿圖片（PNG、JPEG 等）、SVG 檔或 line2func 的 `curves.json`（也可以直接把檔案拖進頁面或貼上）。圖片會先細線化成一像素寬，再追蹤成線條，塗黑的區域則描外框並塗滿；照片和鉛筆稿請先用 line2func 描線，再開啟它的 `curves.json`。塗黑的區域（以及 line2func 的填色區）會用比圈距寬的筆一圈圈塗滿，畫出來是實心的。
 - **整張線稿走成一條路徑。** 線稿的筆畫很少相連，但彼此靠得很近，而且近的地方多半在線身上，不在端點。所以筆從一條筆畫到另一條，是在兩者最近的地方過去：斷口不超過圖大小的 0.5% 就落筆畫線，更寬才抬筆。要從一處到另一處時，筆沿著已經畫過的線走回去（不畫第二次），只有走回去的路超過直接跳過去的 5 倍才抬筆。剩下的跳線照常參與計算，並用細細的灰線畫出來，和線稿分開（可用〔顯示跳線〕關掉）。取樣點數（最多 16,384）與圓的數量會自動選到線條的偏差不超過線寬；指標卡會顯示跳線比例，並與檔案原本的順序比較。這個做法怎麼來的（量測與文獻）寫在 [DECISIONS.md](DECISIONS.md) 的 D46、D47。
 - 〔頻譜〕以對數刻度畫出 |c_k|，使用中的圓是黃銅色。點選一項（滑鼠或方向鍵），畫布上就會標出它的圓，並顯示 k、|c_k| 與 arg(c_k)。
 - 〔跟隨筆尖〕讓筆尖保持在畫面中央，最多放大 50 倍（用縮放鈕或滾輪調整），連最小的圓都看得到。拖曳畫面就會停止跟隨。
 - 〔示範收斂〕依序用 1、2、3、5、10、20、50、100、300、1000 個圓，各畫一輪，最後回到原本的圓數並停下來。
 - 〔圓的數量〕沿著 1、2、3、4、5、6、8、10……1000……12000 一直到 N − 1 的刻度移動；旁邊的輸入框可以填任何整數。
 - 〔依大小〕（在〔更多設定〕裡）先用最大的圓：在同樣的圓數下，這是誤差最小的選法。〔依頻率〕先用轉得最慢的圓，相當於低通濾波。
-- 鍵盤：空白鍵播放／暫停（畫完後是重播）；←／→ 增減圓的數量（加 Shift 每次一個）；＋／− 放大縮小，0 看整張，F 全螢幕；D 開始自己畫；Esc 取消手繪或示範。
+- 鍵盤：空白鍵暫停／繼續（畫完後是重播）；←／→ 增減圓的數量（加 Shift 每次一個）；＋／− 放大縮小，0 看整張，F 全螢幕；D 開始自己畫；Esc 取消手繪或示範。
 
 ### 數字的意思
 

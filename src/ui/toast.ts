@@ -10,3 +10,10 @@ export function toast(text: string, kind: '' | 'error' = '', sticky = false): vo
   clearTimeout(timer);
   if (!sticky) timer = setTimeout(() => { el.hidden = true; }, kind === 'error' ? 7000 : 3500);
 }
+
+/** Take the message away now. */
+export function hideToast(): void {
+  clearTimeout(timer);
+  const el = document.getElementById('toast');
+  if (el) el.hidden = true;
+}

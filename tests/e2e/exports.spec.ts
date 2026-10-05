@@ -80,8 +80,8 @@ test('a saved project opens again exactly as it was', async ({ page }) => {
   const project = JSON.parse(text);
   expect(project).toMatchObject({ format: 'line2fourier.project', version: 1, M: 77, order: 'frequency' });
 
-  await page.locator('#new-drawing').click();
-  expect((await debug(page)).state.source.seed).not.toBe(12345);
+  await page.locator('#clear').click();
+  expect((await debug(page)).empty).toBe(true);
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#project-open').click()]);
   await chooser.setFiles({ name: 'line2fourier-project.json', mimeType: 'application/json', buffer: Buffer.from(text) });
   await expect(page.locator('#toast')).toContainText('已開啟專案');
