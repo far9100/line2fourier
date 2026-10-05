@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { debug, expect, open, test } from './fixtures.ts';
+import { colourNear, debug, evalDebug, expect, inkNear, open, test, type Point } from './fixtures.ts';
 
 const fixture = (name: string) => new URL(`../fixtures/${name}`, import.meta.url);
 
@@ -12,33 +12,6 @@ async function upload(page: Page, name: string) {
   await chooser.setFiles(fileURLToPath(fixture(name)));
   await expect(page.locator('#toast')).toContainText(/已匯入|Imported/, { timeout: 15_000 });
 }
-
-type Point = [number, number];
-const evalDebug = <T,>(page: Page, fn: string, arg?: unknown) =>
-  page.evaluate(([f, a]) => {
-    const d = (window as unknown as { __l2f: { debug(): Record<string, unknown> } }).__l2f.debug();
-    const v = d[f as string];
-    return typeof v === 'function' ? (v as (x: unknown) => unknown)(a) : v;
-  }, [fn, arg] as const) as Promise<T>;
-
-/** Is there a pixel of the given colour within r pixels of the point (on the light theme's white)? */
-async function colourNear(page: Page, colour: 'ink' | 'grey', p: Point, r = 2): Promise<boolean> {
-  return page.evaluate(([x, y, rad, which]) => {
-    const c = document.querySelector('#view') as HTMLCanvasElement;
-    const ratio = c.width / c.getBoundingClientRect().width;
-    const size = 2 * rad + 1;
-    const data = c.getContext('2d')!.getImageData(Math.round((x - rad) * ratio), Math.round((y - rad) * ratio), Math.round(size * ratio), Math.round(size * ratio)).data;
-    for (let i = 0; i < data.length; i += 4) {
-      const [red, green, blue] = [data[i], data[i + 1], data[i + 2]];
-      // ink (the drawing, black): dark; grey (the pen-up moves): neutral and between the drawing's
-      // black and the faint full curve's light grey
-      const hi = Math.max(red, green, blue), lo = Math.min(red, green, blue);
-      if (which === 'ink' ? hi < 110 : hi - lo < 30 && green >= 120 && green <= 215) return true;
-    }
-    return false;
-  }, [p[0], p[1], r, colour] as const);
-}
-const inkNear = (page: Page, p: Point, r = 2) => colourNear(page, 'ink', p, r);
 
 test('an SVG with four shapes far apart: walked with jumps, drawn black with grey jumps that can be hidden, the share shown', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); // paused, with the whole approximation drawn

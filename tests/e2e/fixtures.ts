@@ -45,6 +45,8 @@ export interface Debug {
   };
   t: number;
   firstCycleDone: boolean;
+  /** The pen has been round once and stopped where it started (DECISIONS.md D50). */
+  finished: boolean;
   M: number;
   N: number;
   size: number;
@@ -67,6 +69,46 @@ export interface Debug {
 export function debug(page: Page): Promise<Debug> {
   return page.evaluate(() => (window as unknown as { __l2f: { debug(): Debug } }).__l2f.debug());
 }
+
+/**
+ * Open the page with its time standing still: it moves only when the test says page.clock.runFor(ms),
+ * with animation frames exactly 16 ms apart. Clicks and keys work as usual.
+ */
+export async function openStill(page: Page, query?: string): Promise<void> {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await open(page, query);
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
+  await page.clock.runFor(32); // so the last frame before the test does anything is one of those
+}
+
+export type Point = [number, number];
+
+/** One field of debug(), or what one of its functions returns for `arg` (they do not survive the trip out of the page). */
+export const evalDebug = <T,>(page: Page, fn: string, arg?: unknown) =>
+  page.evaluate(([f, a]) => {
+    const d = (window as unknown as { __l2f: { debug(): Record<string, unknown> } }).__l2f.debug();
+    const v = d[f as string];
+    return typeof v === 'function' ? (v as (x: unknown) => unknown)(a) : v;
+  }, [fn, arg] as const) as Promise<T>;
+
+/** Is there a pixel of the given colour within r pixels of the point (on the light theme's white)? */
+export async function colourNear(page: Page, colour: 'ink' | 'grey', p: Point, r = 2): Promise<boolean> {
+  return page.evaluate(([x, y, rad, which]) => {
+    const c = document.querySelector('#view') as HTMLCanvasElement;
+    const ratio = c.width / c.getBoundingClientRect().width;
+    const size = 2 * rad + 1;
+    const data = c.getContext('2d')!.getImageData(Math.round((x - rad) * ratio), Math.round((y - rad) * ratio), Math.round(size * ratio), Math.round(size * ratio)).data;
+    for (let i = 0; i < data.length; i += 4) {
+      const [red, green, blue] = [data[i], data[i + 1], data[i + 2]];
+      // ink (the drawing, black): dark; grey (the pen-up moves): neutral and between the drawing's
+      // black and the faint full curve's light grey
+      const hi = Math.max(red, green, blue), lo = Math.min(red, green, blue);
+      if (which === 'ink' ? hi < 110 : hi - lo < 30 && green >= 120 && green <= 215) return true;
+    }
+    return false;
+  }, [p[0], p[1], r, colour] as const);
+}
+export const inkNear = (page: Page, p: Point, r = 2) => colourNear(page, 'ink', p, r);
 
 /** Open the page with a fixed drawing and wait until it is on screen. */
 export async function open(page: Page, query = 'gen=creature&seed=42'): Promise<void> {

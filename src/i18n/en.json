@@ -13,6 +13,7 @@
   "ctrl.demo": "Show convergence",
   "ctrl.play": "Play",
   "ctrl.pause": "Pause",
+  "ctrl.replay": "Replay",
   "canvas.label": {
     "one": "Epicycles: {n} circle drawing the line",
     "other": "Epicycles: {n} circles drawing the line"
@@ -83,7 +84,7 @@
   "about.p3": "How fast depends on how smooth the curve is: on a curve that is smooth everywhere the coefficients fall off quickly; with sharp corners |c_k| falls off only like 1/k², so with too few circles the corners get rounded and straight edges ripple.",
   "about.p4": "The coefficients here are the discrete Fourier transform of N points taken at equal arc length along the line. With all N − 1 circles the curve passes through every one of those points; ordered by size, any number of circles gives the smallest RMS error possible with that many.",
   "about.keysTitle": "Keys",
-  "about.keys": "Space: play / pause. ← / →: fewer or more circles (with Shift, one at a time). + / −: zoom in / out. 0: the whole drawing. F: full screen. D: draw your own. Esc: cancel drawing or the demo. On the drawing, the wheel zooms, dragging moves the view and a double-click shows all of it.",
+  "about.keys": "Space: play / pause (replay once the drawing is done). ← / →: fewer or more circles (with Shift, one at a time). + / −: zoom in / out. 0: the whole drawing. F: full screen. D: draw your own. Esc: cancel drawing or the demo. On the drawing, the wheel zooms, dragging moves the view and a double-click shows all of it.",
   "about.close": "Close",
   "ctrl.upload": "Open a drawing",
   "ctrl.uploadTitle": "Open an SVG, a line2func curves.json or a project file (or drop or paste one)",

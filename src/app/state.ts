@@ -56,6 +56,7 @@ export interface AppState {
   view: ViewState;
   /** 'draw': the canvas collects a freehand stroke; 'play': the epicycles run. */
   mode: 'play' | 'draw';
+  /** False while paused. A drawing that is done stops by itself, and this stays true (DECISIONS.md D50). */
   playing: boolean;
   demo: DemoState | null;
   /** The k picked in the spectrum panel, highlighted on the canvas (spec §6). */

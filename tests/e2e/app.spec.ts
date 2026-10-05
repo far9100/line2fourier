@@ -1,4 +1,13 @@
-import { debug, expect, open, test } from './fixtures.ts';
+import type { Page } from '@playwright/test';
+import { debug, evalDebug, expect, inkNear, open, openStill, test, type Point } from './fixtures.ts';
+
+/** The share of the drawing's line that is on screen in black (one stretch in eight looked at). */
+async function lineDrawn(page: Page): Promise<number> {
+  const mids = (await evalDebug<Point[]>(page, 'mids', 0)).filter((_, i) => i % 8 === 0);
+  let drawn = 0;
+  for (const p of mids) if (await inkNear(page, p, 4)) drawn++;
+  return drawn / mids.length;
+}
 
 test('opens playing a drawing, with the page in Traditional Chinese', async ({ page, problems }) => {
   await open(page);
@@ -93,11 +102,106 @@ test('the demo steps through the circle counts and gives M back', async ({ page 
   expect(d.M).toBe(50);
 });
 
+test('a drawing is drawn once: the pen stops where it started with the whole line on screen, and Replay draws it again (D50)', async ({ page }) => {
+  test.slow(); // half a minute of the page's time, every frame of it drawn
+  await openStill(page, 'gen=creature&seed=42&play=0'); // a cycle takes 8 s of the page's time
+  await page.getByText('顯示圓', { exact: true }).click(); // only the line, to look at it
+  await page.locator('#play').click();
+  await expect(page.locator('#play')).toHaveText('暫停');
+
+  // Half way: half of the line. A pause there is a pause, as before.
+  await page.clock.runFor(4000);
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Space');
+  await page.clock.runFor(500);
+  const half = await debug(page);
+  expect(half.state.playing).toBe(false);
+  expect(half.finished).toBe(false);
+  expect(half.t).toBeCloseTo(0.5, 6);
+  await expect(page.locator('#play')).toHaveText('播放');
+  const some = await lineDrawn(page);
+  expect(some).toBeGreaterThan(0.3);
+  expect(some).toBeLessThan(0.85);
+  await page.keyboard.press('Space');
+
+  // The pen comes back to where it started and stops there, all of the line drawn.
+  await page.clock.runFor(3900);
+  expect((await debug(page)).finished).toBe(false);
+  await page.clock.runFor(200);
+  const done = await debug(page);
+  expect(done.finished).toBe(true);
+  expect(done.t).toBeGreaterThan(0.999);
+  expect(done.state.playing).toBe(true); // not paused: the next drawing is drawn without being asked
+  await expect(page.locator('#play')).toHaveText('重播');
+  await expect(page.locator('#play')).toHaveAttribute('aria-pressed', 'false');
+  await page.clock.runFor(2000);
+  expect((await debug(page)).t).toBe(done.t);
+  expect(await lineDrawn(page)).toBeGreaterThan(0.9);
+
+  // More circles: the whole of the new curve, still stopped.
+  await page.keyboard.press('ArrowRight');
+  await page.clock.runFor(100);
+  expect(await debug(page)).toMatchObject({ M: 60, finished: true, t: done.t });
+  expect(await lineDrawn(page)).toBeGreaterThan(0.9);
+
+  // Replay starts over, with the button and with Space.
+  await page.locator('#play').click();
+  await page.clock.runFor(1000);
+  const replay = await debug(page);
+  expect(replay.finished).toBe(false);
+  expect(replay.t).toBeGreaterThan(0.12);
+  expect(replay.t).toBeLessThan(0.13);
+  await expect(page.locator('#play')).toHaveText('暫停');
+  await expect(page.locator('#play')).toHaveAttribute('aria-pressed', 'true');
+  await page.clock.runFor(7100);
+  expect((await debug(page)).finished).toBe(true);
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Space');
+  await page.clock.runFor(1000);
+  expect((await debug(page)).finished).toBe(false);
+
+  // A new drawing after one is done is drawn too.
+  await page.clock.runFor(7100);
+  expect((await debug(page)).finished).toBe(true);
+  await page.locator('#new-drawing').click();
+  await page.clock.runFor(1000);
+  const next = await debug(page);
+  expect(next.state.source.seed).not.toBe(42);
+  expect(next.finished).toBe(false);
+  expect(next.t).toBeGreaterThan(0.12);
+  expect(next.t).toBeLessThan(0.13);
+});
+
+test('the demo ends by itself: the circles there were before, the whole line, the pen stopped (D50)', async ({ page }) => {
+  test.slow(); // 35 s of the page's time, every frame of it drawn
+  await openStill(page);
+  await page.getByText('顯示圓', { exact: true }).click(); // less to draw in each frame
+  await page.locator('#demo').click();
+  // Each count takes 3.5 s: look in the middle of each. With frames 16 ms apart the fourth count ends
+  // on a frame exactly (14 s is 875 of them), the time a hair short of the end without having gone
+  // round: that is not the end of the drawing, and the demo goes on to 10 circles.
+  await page.clock.runFor(1750);
+  for (const M of [1, 2, 3, 5, 10, 20, 50, 100, 300, 1000]) {
+    const d = await debug(page);
+    expect(d.M).toBe(M);
+    expect(d.finished).toBe(false);
+    await page.clock.runFor(3500);
+  }
+  const d = await debug(page);
+  expect(d.state.demo).toBeNull();
+  expect(d.M).toBe(50);
+  expect(d.finished).toBe(true);
+  await expect(page.locator('#demo')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#play')).toHaveText('重播');
+  expect(await lineDrawn(page)).toBeGreaterThan(0.9);
+});
+
 test('reduced motion: starts paused, with the whole approximation shown', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await open(page);
   const d = await debug(page);
   expect(d.state.playing).toBe(false);
+  await expect(page.locator('#play')).toHaveText('播放');
   expect(d.firstCycleDone).toBe(true);
   await page.waitForTimeout(300);
   expect((await debug(page)).t).toBe(0);

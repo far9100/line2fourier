@@ -78,6 +78,8 @@ const worker = createWorkerClient();
 let computed: Computed;
 let tCycle = 0;
 let firstCycleDone = reducedMotion;
+/** The drawing is done: the pen has been round once and stopped where it started (DECISIONS.md D50). */
+let finished = false;
 let draft: Pt[] | null = null;
 let dirty = true;
 let lastFrame = performance.now();
@@ -125,23 +127,35 @@ function recompute(s: AppState): boolean {
 
 // ---------------------------------------------------------------- animation
 
+/** Back to the start of a cycle, to be drawn from there. */
+function rewind(): void {
+  tCycle = 0;
+  finished = false;
+}
+
+/**
+ * The pen is back where it started. The demo goes on to its next count; otherwise the drawing is
+ * done and the pen stops there, the whole line on screen, until it is played again (DECISIONS.md D50).
+ */
 function cycleEnded(): void {
   const s = store.get();
-  if (!s.demo) {
-    firstCycleDone = true;
+  const steps = demoSequence(s.N);
+  if (s.demo && s.demo.step + 1 < steps.length) {
+    store.set({ demo: { ...s.demo, step: s.demo.step + 1 }, M: steps[s.demo.step + 1] });
     return;
   }
-  const steps = demoSequence(s.N);
-  const next = s.demo.step + 1;
-  if (next < steps.length) store.set({ demo: { ...s.demo, step: next }, M: steps[next] });
-  else store.set({ demo: null, M: s.demo.returnM });
+  finished = true;
+  tCycle = WHOLE;
+  firstCycleDone = true;
+  if (s.demo) store.set({ demo: null, M: s.demo.returnM });
+  else showControls(s);
 }
 
 function frame(now: number): void {
   const s = store.get();
   const dt = now - lastFrame;
   lastFrame = now;
-  const running = s.playing && s.mode === 'play' && !!view.scene;
+  const running = s.playing && !finished && s.mode === 'play' && !!view.scene;
   if (running) {
     const step = advance(tCycle, dt, cycleMs(s.speed, !!s.demo));
     tCycle = step.t;
@@ -218,8 +232,21 @@ function applySeed(): void {
 
 $('#draw').addEventListener('click', () => enterDraw());
 $('#draw-cancel').addEventListener('click', () => leaveDraw());
-$('#play').addEventListener('click', () => store.set({ playing: !store.get().playing }));
+$('#play').addEventListener('click', togglePlay);
 $('#demo').addEventListener('click', toggleDemo);
+
+/** Play and pause; once the drawing is done, draw it again from the start. */
+function togglePlay(): void {
+  const s = store.get();
+  if (!finished) {
+    store.set({ playing: !s.playing });
+    return;
+  }
+  rewind();
+  dirty = true;
+  if (s.playing) showControls(s);
+  else store.set({ playing: true });
+}
 
 function toggleDemo(): void {
   const s = store.get();
@@ -227,7 +254,7 @@ function toggleDemo(): void {
     store.set({ demo: null, M: s.demo.returnM });
     return;
   }
-  tCycle = 0;
+  rewind();
   store.set({ demo: { step: 0, returnM: s.M }, M: demoSequence(s.N)[0], mode: 'play', playing: true });
 }
 
@@ -521,7 +548,7 @@ async function importDrawing(file: Incoming, prepare: () => Promise<Prepared | {
     type: file.kind, name: file.name, sha256: file.sha256, content: file.content,
     strokes: prepared.strokes, strokeCount: prepared.penDownStrokes, originalJumpRatio: prepared.originalJumpRatio,
   };
-  tCycle = 0;
+  rewind();
   if (settings) {
     store.set({ source, ...settings, mode: 'play', demo: null, selectedK: null });
   } else {
@@ -545,7 +572,7 @@ async function openProject(text: string): Promise<void> {
   const settings: Settings = { N: p.N, M: p.M, order: p.order, speed: p.speed, view: p.view };
   const src = p.source;
   if (src.type === 'random' || src.type === 'freehand') {
-    tCycle = 0;
+    rewind();
     store.set({ source: src, ...settings, mode: 'play', demo: null, selectedK: null });
     toast([t('project.loaded'), ...parsed.warnings.map(w => t(w))].join(' '), '');
     return;
@@ -597,7 +624,7 @@ window.addEventListener('paste', e => {
 });
 
 bindKeys({
-  togglePlay: () => store.set({ playing: !store.get().playing }),
+  togglePlay,
   step: (dir, fine) => { const s = store.get(); store.set({ M: stepM(s.M, s.N, dir, fine) }); },
   draw: () => enterDraw(),
   escape: () => {
@@ -617,9 +644,10 @@ const GENERATOR_KEYS: Record<GeneratorName, string> = { creature: 'gen.creature'
 let formulaFor: { ordered: Ordered; M: number; lang: Lang } | null = null;
 
 function showControls(s: AppState): void {
-  $('#play').setAttribute('aria-pressed', String(s.playing));
-  $('#play-label').dataset.i18n = s.playing ? 'ctrl.pause' : 'ctrl.play';
-  $('#play-label').textContent = t(s.playing ? 'ctrl.pause' : 'ctrl.play');
+  const playKey = finished ? 'ctrl.replay' : s.playing ? 'ctrl.pause' : 'ctrl.play';
+  $('#play').setAttribute('aria-pressed', String(s.playing && !finished));
+  $('#play-label').dataset.i18n = playKey;
+  $('#play-label').textContent = t(playKey);
   $('#demo').setAttribute('aria-pressed', String(!!s.demo));
   $('#draw').setAttribute('aria-pressed', String(s.mode === 'draw'));
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === s.lang));
@@ -728,7 +756,7 @@ store.subscribe((s, prev) => {
       return;
     }
     if (s.source !== prev.source) {
-      tCycle = 0;
+      rewind();
       firstCycleDone = reducedMotion;
     }
   }
@@ -761,6 +789,7 @@ Object.defineProperty(window, '__l2f', {
         },
         t: tCycle,
         firstCycleDone,
+        finished,
         M: computed.M,
         N: computed.N,
         size: computed.size,
